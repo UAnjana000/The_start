@@ -8,6 +8,7 @@ import { AlertsTab } from './components/AlertsTab';
 import { DataGraphsTab } from './components/DataGraphsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { TacticalCanvas } from './components/TacticalCanvas';
+import { SimulationEditorModal } from './components/SimulationEditorModal';
 import { VideoPiP } from './components/VideoPiP';
 import {
   TacticalNode,
@@ -351,6 +352,7 @@ export default function TacticalDashboardPage() {
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [systemSinrAvg, setSystemSinrAvg] = useState<number>(24.2);
   const [totalPacketsLogged, setTotalPacketsLogged] = useState<number>(0);
+  const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const currentNodes = mode === 'live'
@@ -918,8 +920,27 @@ export default function TacticalDashboardPage() {
                   simTime={simTime}
                   simPhaseName={currentSimPhase}
                   onSeekSimTime={setSimTime}
+                  onOpenEditor={() => setIsEditorOpen(true)}
                 />
               </div>
+
+              {/* Simulation Scenario Editor & Keyframe Recorder Modal */}
+              <SimulationEditorModal
+                isOpen={isEditorOpen}
+                onClose={() => setIsEditorOpen(false)}
+                nodes={simNodes}
+                walls={walls}
+                onUpdateNodes={(updated) => {
+                  setSimNodes(updated);
+                  updateTopology(updated, walls, jammer, mode);
+                }}
+                onUpdateWalls={(updated) => {
+                  setWalls(updated);
+                  updateTopology(simNodes, updated, jammer, mode);
+                }}
+                simTime={simTime}
+                onSeekSimTime={setSimTime}
+              />
 
               {/* 4 Core Tactical Flow Cards - SIH Smart Helmet 4-Node Demonstration */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">

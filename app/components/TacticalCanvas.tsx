@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import { TacticalNode, NodeLink, ObstacleWall, GhostNode, OperationalMode, JammerState } from '../types/tactical';
-import { Crosshair, Shield, RotateCcw, AlertTriangle, Move, Focus, Play, Pause } from 'lucide-react';
+import { Crosshair, Shield, RotateCcw, AlertTriangle, Move, Focus, Play, Pause, FileJson } from 'lucide-react';
 import { SectorBeamforming } from './SectorBeamforming';
 import { JammerControl } from './JammerControl';
 
@@ -24,6 +24,7 @@ interface TacticalCanvasProps {
   simTime?: number;
   simPhaseName?: string;
   onSeekSimTime?: (time: number) => void;
+  onOpenEditor?: () => void;
 }
 
 export function getLinkRssiStyle(rssiDbm: number = -70, isBlocked: boolean = false, isOffline: boolean = false) {
@@ -105,6 +106,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
   simTime = 0.0,
   simPhaseName,
   onSeekSimTime,
+  onOpenEditor,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
@@ -804,6 +806,16 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
               <span className="text-xs font-mono font-extrabold text-tactical-cyan bg-sky-950/80 border border-sky-800 px-2 py-0.5">
                 {simTime.toFixed(1)}s / 15.0s
               </span>
+              {onOpenEditor && (
+                <button
+                  onClick={onOpenEditor}
+                  className="px-2.5 py-1 bg-gradient-to-r from-purple-950 to-indigo-950 hover:from-purple-900 hover:to-indigo-900 text-purple-300 border border-purple-700 text-xs font-bold uppercase rounded-sm flex items-center gap-1.5 shadow transition-all"
+                  title="Add/Delete nodes & walls, record positions, and export JSON"
+                >
+                  <FileJson className="w-3.5 h-3.5 text-purple-400" />
+                  <span>EDIT SIM & JSON</span>
+                </button>
+              )}
               <button
                 onClick={onTogglePlaySim}
                 className={`px-3 py-1 flex items-center gap-1.5 text-xs font-black tracking-wider uppercase rounded-sm border shadow-sm transition-all ${

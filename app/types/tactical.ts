@@ -87,3 +87,18 @@ export type TabKey = 'home' | 'dashboard' | 'simulate' | 'nodes' | 'alerts' | 'd
 export type LanguageKey = 'en' | 'hi' | 'es' | 'fr' | 'de';
 export type ThemeMode = 'light' | 'dark';
 
+export interface ScenarioKeyframe {
+  id: string;
+  time: number; // in seconds (e.g. 0.0, 4.0, 8.0, 12.0)
+  phaseName: string;
+  positions: Record<string, { x: number; y: number }>;
+}
+
+export interface SimulationScenario {
+  scenarioName: string;
+  durationSeconds: number;
+  walls: ObstacleWall[];
+  initialNodes: TacticalNode[];
+  keyframes: ScenarioKeyframe[];
+}
+
