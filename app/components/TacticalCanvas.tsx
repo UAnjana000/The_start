@@ -844,42 +844,42 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
               <button
                 onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime < 4.5
+                  simTime < 4.0
                     ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                01: INGRESS (0s)
+                01: BASELINE (0s)
               </button>
               <button
-                onClick={() => onSeekSimTime && onSeekSimTime(4.5)}
+                onClick={() => onSeekSimTime && onSeekSimTime(4.0)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 4.5 && simTime < 8.5
+                  simTime >= 4.0 && simTime < 8.0
+                    ? 'bg-cyan-950 text-cyan-300 border-cyan-600 shadow-sm ring-1 ring-cyan-500/50'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
+                }`}
+              >
+                02: RSSI LOSS (4s)
+              </button>
+              <button
+                onClick={() => onSeekSimTime && onSeekSimTime(8.0)}
+                className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
+                  simTime >= 8.0 && simTime < 11.0
                     ? 'bg-red-950 text-red-300 border-red-600 shadow-sm ring-1 ring-red-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                02: BLOCKED (4.5s)
+                03: BLOCKED (8s)
               </button>
               <button
-                onClick={() => onSeekSimTime && onSeekSimTime(8.5)}
+                onClick={() => onSeekSimTime && onSeekSimTime(11.0)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 8.5 && simTime < 11.5
-                    ? 'bg-amber-950 text-amber-300 border-amber-600 shadow-sm ring-1 ring-amber-500/50'
-                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
-                }`}
-              >
-                03: DROP RELAY (8.5s)
-              </button>
-              <button
-                onClick={() => onSeekSimTime && onSeekSimTime(11.5)}
-                className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 11.5
+                  simTime >= 11.0
                     ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                04: HEALED (11.5s)
+                04: AD-HOC MESH (11s)
               </button>
             </div>
 
@@ -897,7 +897,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
             >
               <div
                 style={{ width: `${(simTime / 15.0) * 100}%` }}
-                className="h-full bg-gradient-to-r from-emerald-500 via-red-500 via-amber-500 to-emerald-500 transition-all duration-75"
+                className="h-full bg-gradient-to-r from-emerald-500 via-cyan-500 via-red-500 to-emerald-500 transition-all duration-75"
               />
             </div>
           </div>
@@ -932,7 +932,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
         <div className="absolute bottom-12 left-3 z-20 pointer-events-auto bg-sky-950/90 border border-sky-600/80 px-3 py-1.5 text-[11px] text-sky-200 flex items-center gap-2 shadow-lg font-mono">
           <span>💡</span>
           <span>
-            <strong>Interactive Mode:</strong> Drag <strong>ALPHA-POINT</strong> behind the concrete wall to see signal sever to RED; move near <strong>RELAY</strong> to see 2-hop mesh turn GREEN.
+            <strong>Interactive Sandbox:</strong> Drag <strong>ALPHA-POINT</strong> away from <strong>BRAVO</strong> to see RSSI drop; drag behind the wall to see signal autonomously re-route through <strong>CHARLIE</strong> around the obstacle!
           </span>
         </div>
       )}

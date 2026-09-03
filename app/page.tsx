@@ -57,60 +57,56 @@ const SIMULATION_NODES: TacticalNode[] = [
     callsign: 'ALPHA-POINT',
     displayName: 'ALPHA-POINT',
     role: 'pointman',
-    x: 4.5,
-    y: 2.5,
+    x: 3.5,
+    y: 0.5,
     battery: 94,
-    activeSector: 3,
+    activeSector: 1,
     txPowerDbm: 20.0,
     noiseFloorDbm: -95.0,
+    hopCount: 2,
+    nextHopId: 'CMD-02',
+  },
+  {
+    id: 'CMD-02',
+    callsign: 'BRAVO-SUPPORT',
+    displayName: 'BRAVO-SUPPORT',
+    role: 'assault',
+    x: 3.0,
+    y: 2.5,
+    battery: 88,
+    activeSector: 4,
+    txPowerDbm: 20.0,
+    noiseFloorDbm: -95.0,
+    hopCount: 1,
+    nextHopId: 'TANK-00',
   },
   {
     id: 'CMD-03',
-    callsign: 'CHARLIE-RELAY',
-    displayName: 'CHARLIE-RELAY',
+    callsign: 'CHARLIE-CORNER',
+    displayName: 'CHARLIE-CORNER',
     role: 'breacher',
-    x: 13.5,
-    y: 7.5,
+    x: 7.0,
+    y: 5.0,
     battery: 86,
     activeSector: 4,
     txPowerDbm: 20.0,
     noiseFloorDbm: -95.0,
-  },
-  {
-    id: 'CMD-05',
-    callsign: 'ECHO-SCOUT',
-    displayName: 'ECHO-SCOUT',
-    role: 'scout_relay',
-    x: 21.5,
-    y: 9.5,
-    battery: 78,
-    activeSector: 4,
-    txPowerDbm: 20.0,
-    noiseFloorDbm: -95.0,
-  },
-  {
-    id: 'CMD-02',
-    callsign: 'BRAVO-ASSAULT',
-    displayName: 'BRAVO-ASSAULT',
-    role: 'assault',
-    x: 16.5,
-    y: -9.0,
-    battery: 81,
-    activeSector: 4,
-    txPowerDbm: 20.0,
-    noiseFloorDbm: -95.0,
+    hopCount: 1,
+    nextHopId: 'TANK-00',
   },
   {
     id: 'CMD-04',
-    callsign: 'DELTA-MARKS',
-    displayName: 'DELTA-MARKS',
+    callsign: 'DELTA-SCOUT',
+    displayName: 'DELTA-SCOUT',
     role: 'marksman',
-    x: -9.5,
-    y: -6.0,
-    battery: 89,
-    activeSector: 2,
+    x: 5.2,
+    y: 2.0,
+    battery: 90,
+    activeSector: 4,
     txPowerDbm: 20.0,
     noiseFloorDbm: -95.0,
+    hopCount: 2,
+    nextHopId: 'CMD-02',
   },
 ];
 
@@ -182,90 +178,63 @@ export default function TacticalDashboardPage() {
   }, [isPlayingSim, activeTab]);
 
   // Derive dynamic NSG tactical simulation state from 15-second timeline
-  // Derive dynamic tactical simulation state from 15-second timeline
+  // Derive dynamic tactical simulation state from 15-second timeline (4 nodes ad-hoc scenario)
   const { currentSimNodes, currentSimGhostNodes, currentSimPhase } = useMemo(() => {
     const t = simTime; // 0.0 to 15.0 seconds
     let phase = '';
-    let alphaX = 2.0;
-    let alphaY = 1.2;
+    let alphaX = 3.5;
+    let alphaY = 0.5;
     let alphaOffline = false;
-    let lastX = 7.0;
-    let lastY = 3.8;
-    let ghosts: GhostNode[] = [];
-    let alphaHop = 1;
-    let alphaNextHop = 'TANK-00';
-    let alphaSector = 2;
+    let lastX = 3.5;
+    let lastY = 0.5;
+    const ghosts: GhostNode[] = [];
+    let alphaHop = 2;
+    let alphaNextHop = 'CMD-02';
+    let alphaSector = 1;
 
-    if (t < 4.5) {
-      // PHASE 1: INGRESS (0.0s - 4.5s)
-      const progress = t / 4.5;
-      alphaX = parseFloat((2.0 + progress * 5.0).toFixed(1)); // moves cleanly from 2.0 to 7.0
-      alphaY = parseFloat((1.2 + progress * 2.6).toFixed(1)); // moves cleanly from 1.2 to 3.8
-      alphaOffline = false;
-      alphaSector = 2;
-      lastX = alphaX;
-      lastY = alphaY;
-      phase = '01: INGRESS // POINTMAN ADVANCING IN CORRIDOR (DIRECT LoS)';
-    } else if (t < 8.5) {
-      // PHASE 2: BEHIND CONCRETE WALL // BLOCKED (4.5s - 8.5s)
-      const progress = (t - 4.5) / 4.0;
-      alphaX = parseFloat((7.0 + progress * 6.5).toFixed(1)); // moves past corner from 7.0 to 13.5
-      alphaY = parseFloat((3.8 + progress * 3.2).toFixed(1)); // moves from 3.8 to 7.0
-      alphaOffline = true;
-      lastX = 7.0;
-      lastY = 3.8;
-      alphaSector = 4;
-      phase = '02: BLOCKED // 0.35m CONCRETE WALL CUTS LINE-OF-SIGHT';
-    } else if (t < 11.5) {
-      // PHASE 3: DROPPING RELAY AT CORNER (8.5s - 11.5s)
-      alphaX = 13.5;
-      alphaY = 7.0;
-      alphaOffline = true;
-      lastX = 7.0;
-      lastY = 3.8;
-      alphaSector = 4;
-      ghosts = [
-        {
-          targetNodeId: 'GHOST-CORNER-01',
-          targetCallsign: 'RELAY-01',
-          optimalX: 7.2,
-          optimalY: 4.2,
-          currentX: 7.2,
-          currentY: 4.2,
-          shiftDistanceMeters: 0,
-          shiftBearingDeg: 45,
-          shiftCardinal: 'CORNER CORRIDOR (7.2, 4.2)',
-          predictedSinrGainDb: 22.4,
-          actionRequired: 'deploy_bridge_node',
-          relayForNodeId: 'CMD-01',
-        },
-      ];
-      phase = '03: DEPLOY RELAY // MESH NODE DROPPED AT CORNER';
-    } else {
-      // PHASE 4: 2-HOP MESH RESTORED AROUND WALL (11.5s - 15.0s)
-      alphaX = 13.5;
-      alphaY = 7.0;
+    if (t < 4.0) {
+      // PHASE 1: 4 NODES INITIAL (2 to Tank, other 2 to Bravo)
+      alphaX = 3.5;
+      alphaY = 0.5;
       alphaOffline = false;
       alphaHop = 2;
-      alphaNextHop = 'GHOST-CORNER-01';
+      alphaNextHop = 'CMD-02';
+      alphaSector = 1;
+      phase = '01: 4 NODES INITIAL // 2 WITH TANK (BRAVO, CHARLIE) & 2 TO BRAVO (ALPHA, DELTA)';
+    } else if (t < 8.0) {
+      // PHASE 2: ALPHA ADVANCES // DISTANCE INCREASES ➔ RSSI DECREASES
+      const progress = (t - 4.0) / 4.0;
+      alphaX = parseFloat((3.5 + progress * 3.3).toFixed(1)); // moves from 3.5 to 6.8
+      alphaY = parseFloat((0.5 + progress * 1.3).toFixed(1)); // moves from 0.5 to 1.8
+      alphaOffline = false;
+      alphaHop = 2;
+      alphaNextHop = 'CMD-02';
       alphaSector = 4;
-      ghosts = [
-        {
-          targetNodeId: 'GHOST-CORNER-01',
-          targetCallsign: 'RELAY-01',
-          optimalX: 7.2,
-          optimalY: 4.2,
-          currentX: 7.2,
-          currentY: 4.2,
-          shiftDistanceMeters: 0,
-          shiftBearingDeg: 45,
-          shiftCardinal: 'CORNER CORRIDOR (7.2, 4.2)',
-          predictedSinrGainDb: 22.4,
-          actionRequired: 'deploy_bridge_node',
-          relayForNodeId: 'CMD-01',
-        },
-      ];
-      phase = '04: MESH RESTORED // 2-HOP ROUTE VIA RELAY (100% HEALED)';
+      lastX = alphaX;
+      lastY = alphaY;
+      const currentRssi = Math.round(-53 - progress * 26);
+      phase = `02: DISTANCE INCREASES ➔ RSSI DECREASES (${currentRssi} dBm)`;
+    } else if (t < 11.0) {
+      // PHASE 3: MOVES BEHIND WALL // DIRECT LINK BLOCKED RED
+      const progress = (t - 8.0) / 3.0;
+      alphaX = parseFloat((6.8 + progress * 5.2).toFixed(1)); // moves from 6.8 to 12.0
+      alphaY = parseFloat((1.8 + progress * 4.2).toFixed(1)); // moves from 1.8 to 6.0
+      alphaOffline = true;
+      alphaHop = 99;
+      alphaNextHop = 'OFFLINE';
+      lastX = 6.8;
+      lastY = 1.8;
+      alphaSector = 4;
+      phase = '03: WALL OCCLUSION // 0.35m CONCRETE CUTS DIRECT LINK (🔴 BLOCKED -98 dBm)';
+    } else {
+      // PHASE 4: AD-HOC MESH RE-ROUTES AROUND WALL THROUGH CHARLIE
+      alphaX = 12.0;
+      alphaY = 6.0;
+      alphaOffline = false;
+      alphaHop = 2;
+      alphaNextHop = 'CMD-03';
+      alphaSector = 4;
+      phase = '04: AD-HOC REROUTE // SIGNAL BOUNCES AROUND WALL VIA CHARLIE (🟢 HEALED)';
     }
 
     const squadNodes: TacticalNode[] = [
@@ -288,19 +257,46 @@ export default function TacticalDashboardPage() {
         nextHopId: alphaNextHop,
       },
       {
-        id: 'CMD-03',
-        callsign: 'CHARLIE-RELAY',
-        displayName: 'CHARLIE-RELAY',
-        role: 'breacher',
-        x: 7.2,
-        y: 4.2,
-        battery: 86,
-        activeSector: 2,
+        id: 'CMD-02',
+        callsign: 'BRAVO-SUPPORT',
+        displayName: 'BRAVO-SUPPORT',
+        role: 'assault',
+        x: 3.0,
+        y: 2.5,
+        battery: 88,
+        activeSector: 4,
         txPowerDbm: 20.0,
         noiseFloorDbm: -95.0,
         hopCount: 1,
         nextHopId: 'TANK-00',
-        isHidden: t < 8.5,
+      },
+      {
+        id: 'CMD-03',
+        callsign: 'CHARLIE-CORNER',
+        displayName: 'CHARLIE-CORNER',
+        role: 'breacher',
+        x: 7.0,
+        y: 5.0,
+        battery: 86,
+        activeSector: 4,
+        txPowerDbm: 20.0,
+        noiseFloorDbm: -95.0,
+        hopCount: 1,
+        nextHopId: 'TANK-00',
+      },
+      {
+        id: 'CMD-04',
+        callsign: 'DELTA-SCOUT',
+        displayName: 'DELTA-SCOUT',
+        role: 'marksman',
+        x: 5.2,
+        y: 2.0,
+        battery: 90,
+        activeSector: 4,
+        txPowerDbm: 20.0,
+        noiseFloorDbm: -95.0,
+        hopCount: 2,
+        nextHopId: 'CMD-02',
       },
     ];
 
@@ -370,68 +366,192 @@ export default function TacticalDashboardPage() {
         const t = simTime;
         const simLinks: NodeLink[] = [];
 
-        if (t < 4.5) {
-          // Phase 1: TOC -> ALPHA-POINT (Direct LoS, Strong Green)
-          const dist = parseFloat((2.5 + (t / 4.5) * 4.8).toFixed(1));
-          const rssi = parseFloat((-54.0 - (t / 4.5) * 6.0).toFixed(1));
+        if (t < 4.0) {
+          // Phase 1: 4 Nodes Baseline (2 to Tank: Bravo & Charlie, 2 to Bravo: Alpha & Delta)
           simLinks.push({
             fromId: 'TANK-00',
-            toId: 'CMD-01',
-            distanceMeters: dist,
-            rssiDbm: rssi,
-            sinrDb: 26.4,
+            toId: 'CMD-02',
+            distanceMeters: 3.9,
+            rssiDbm: -56.0,
+            sinrDb: 28.5,
+            status: 'healthy',
+            videoBitrateKbps: 4800,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-03',
+            distanceMeters: 8.6,
+            rssiDbm: -60.0,
+            sinrDb: 26.2,
             status: 'healthy',
             videoBitrateKbps: 4500,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
-        } else if (t < 8.5) {
-          // Phase 2: Broken/Blocked link through concrete wall (Red Dashed)
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'CMD-01',
+            distanceMeters: 2.1,
+            rssiDbm: -53.0,
+            sinrDb: 29.8,
+            status: 'healthy',
+            videoBitrateKbps: 5000,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'CMD-04',
+            distanceMeters: 2.3,
+            rssiDbm: -54.0,
+            sinrDb: 29.2,
+            status: 'healthy',
+            videoBitrateKbps: 4900,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+        } else if (t < 8.0) {
+          // Phase 2: Alpha advances away from Bravo towards wall (Distance inc -> RSSI dec)
+          const progress = (t - 4.0) / 4.0;
+          const alphaDist = parseFloat((2.1 + progress * 4.5).toFixed(1)); // 2.1m to 6.6m
+          const alphaRssi = parseFloat((-53.0 - progress * 26.0).toFixed(1)); // -53 dBm -> -79 dBm
+          const alphaSinr = parseFloat((29.8 - progress * 15.0).toFixed(1)); // 29.8 dB -> 14.8 dB
+
           simLinks.push({
             fromId: 'TANK-00',
+            toId: 'CMD-02',
+            distanceMeters: 3.9,
+            rssiDbm: -56.0,
+            sinrDb: 28.5,
+            status: 'healthy',
+            videoBitrateKbps: 4800,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-03',
+            distanceMeters: 8.6,
+            rssiDbm: -60.0,
+            sinrDb: 26.2,
+            status: 'healthy',
+            videoBitrateKbps: 4500,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
             toId: 'CMD-01',
-            distanceMeters: 15.2,
+            distanceMeters: alphaDist,
+            rssiDbm: alphaRssi,
+            sinrDb: alphaSinr,
+            status: alphaRssi < -72 ? 'degraded' : 'healthy',
+            videoBitrateKbps: alphaRssi < -72 ? 1800 : 4200,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'CMD-04',
+            distanceMeters: 2.3,
+            rssiDbm: -54.0,
+            sinrDb: 29.2,
+            status: 'healthy',
+            videoBitrateKbps: 4900,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+        } else if (t < 11.0) {
+          // Phase 3: Alpha moves behind concrete wall (Direct link severed to RED)
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-02',
+            distanceMeters: 3.9,
+            rssiDbm: -56.0,
+            sinrDb: 28.5,
+            status: 'healthy',
+            videoBitrateKbps: 4800,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-03',
+            distanceMeters: 8.6,
+            rssiDbm: -60.0,
+            sinrDb: 26.2,
+            status: 'healthy',
+            videoBitrateKbps: 4500,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'CMD-04',
+            distanceMeters: 2.3,
+            rssiDbm: -54.0,
+            sinrDb: 29.2,
+            status: 'healthy',
+            videoBitrateKbps: 4900,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'CMD-01',
+            distanceMeters: 9.8,
             rssiDbm: -98.0,
-            sinrDb: 3.2,
+            sinrDb: 2.1,
             status: 'broken',
             videoBitrateKbps: 0,
             isBlockedByWall: true,
             isMeshRoute: false,
           });
-        } else if (t < 11.5) {
-          // Phase 3: Relay dropped at corner, establishing bridge
-          simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'GHOST-CORNER-01',
-            distanceMeters: 8.3,
-            rssiDbm: -60.0,
-            sinrDb: 25.5,
-            status: 'healthy',
-            videoBitrateKbps: 4500,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
         } else {
-          // Phase 4: Snapped 2-hop bounced link around wall (Both Green)
+          // Phase 4: Ad-hoc mesh routes around the wall via Charlie at the corner!
           simLinks.push({
             fromId: 'TANK-00',
-            toId: 'GHOST-CORNER-01',
-            distanceMeters: 8.3,
+            toId: 'CMD-03',
+            distanceMeters: 8.6,
             rssiDbm: -60.0,
-            sinrDb: 25.5,
+            sinrDb: 26.2,
             status: 'healthy',
             videoBitrateKbps: 4500,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
           simLinks.push({
-            fromId: 'GHOST-CORNER-01',
+            fromId: 'CMD-03',
             toId: 'CMD-01',
-            distanceMeters: 6.4,
+            distanceMeters: 5.1,
             rssiDbm: -58.0,
-            sinrDb: 27.8,
+            sinrDb: 27.5,
             status: 'healthy',
-            videoBitrateKbps: 4500,
+            videoBitrateKbps: 4600,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-02',
+            distanceMeters: 3.9,
+            rssiDbm: -56.0,
+            sinrDb: 28.5,
+            status: 'healthy',
+            videoBitrateKbps: 4800,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'CMD-04',
+            distanceMeters: 2.3,
+            rssiDbm: -54.0,
+            sinrDb: 29.2,
+            status: 'healthy',
+            videoBitrateKbps: 4900,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
@@ -801,45 +921,45 @@ export default function TacticalDashboardPage() {
                 />
               </div>
 
-              {/* 4 Core Tactical Flow Cards - SIH Smart Helmet Demonstration */}
+              {/* 4 Core Tactical Flow Cards - SIH Smart Helmet 4-Node Demonstration */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                 <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
                   <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>01. CORRIDOR INGRESS</span>
+                    <span>01. 4-NODE BASELINE</span>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
-                    Pointman advances through clear corridor with direct line-of-sight to Base TOC. Link RSSI is strong (<span className="text-emerald-500 font-semibold font-mono">≥ -60 dBm, 🟢 Green</span>).
+                    2 nodes connect to Tank (<strong>BRAVO</strong> & <strong>CHARLIE</strong>). Other 2 connect to <strong>BRAVO</strong> (<strong>ALPHA</strong> & <strong>DELTA</strong>). All links strong (<span className="text-emerald-500 font-semibold font-mono">≥ -60 dBm, 🟢 Green</span>).
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
+                  <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 text-xs font-bold uppercase">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+                    <span>02. DISTANCE ➔ RSSI LOSS</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
+                    As <strong>ALPHA</strong> advances towards the wall, distance increases: link RSSI drops from <span className="text-emerald-500 font-semibold font-mono">-53 dBm (🟢 Green)</span> ➔ <span className="text-cyan-500 font-semibold font-mono">-68 dBm (🔵 Cyan)</span> ➔ <span className="text-amber-500 font-semibold font-mono">-79 dBm (🟡 Amber)</span>.
                   </p>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
                   <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold uppercase">
                     <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
-                    <span>02. WALL BLOCKED</span>
+                    <span>03. WALL BLOCKS DIRECT</span>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
-                    Moving behind 0.35m reinforced concrete causes -28 dB loss. Signal severs and drops to <span className="text-red-500 font-semibold font-mono">-98 dBm (🔴 Red Dashed, Blocked)</span>.
+                    <strong>ALPHA</strong> steps behind 0.35m concrete wall (-28 dB loss). Direct link to <strong>BRAVO</strong> severs to <span className="text-red-500 font-semibold font-mono">-98 dBm (🔴 Red Dashed, Blocked)</span>.
                   </p>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
-                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs font-bold uppercase">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    <span>03. DEPLOY RELAY</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
-                    A relay node is dropped at the corridor corner (7.2, 4.2), establishing clear line-of-sight to both Base TOC and Pointman.
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
-                  <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 text-xs font-bold uppercase">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>04. 2-HOP MESH HEALED</span>
+                    <span>04. AD-HOC MESH REROUTE</span>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
-                    Autonomous ad-hoc routing bounces signal around the corner: TOC ➔ Relay ➔ Pointman. Full telemetry restored (<span className="text-emerald-500 font-semibold font-mono">🟢 Both Green</span>).
+                    Ad-hoc mesh dynamically routes around the wall through other nodes: <strong>ALPHA</strong> ➔ <strong>CHARLIE</strong> (at corner) ➔ <strong>TANK</strong>. Full link restored (<span className="text-emerald-500 font-semibold font-mono">🟢 All Green</span>).
                   </p>
                 </div>
               </div>
