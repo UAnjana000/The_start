@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import { TacticalNode, NodeLink, ObstacleWall, GhostNode, OperationalMode, JammerState } from '../types/tactical';
-import { Crosshair, Shield, RotateCcw, AlertTriangle, Move, Focus } from 'lucide-react';
+import { Crosshair, Shield, RotateCcw, AlertTriangle, Move, Focus, Play, Pause } from 'lucide-react';
 import { SectorBeamforming } from './SectorBeamforming';
 import { JammerControl } from './JammerControl';
 
@@ -19,6 +19,11 @@ interface TacticalCanvasProps {
   mode: OperationalMode;
   jammer: JammerState;
   onUpdateJammer: (jammer: JammerState) => void;
+  isPlayingSim?: boolean;
+  onTogglePlaySim?: () => void;
+  simTime?: number;
+  simPhaseName?: string;
+  onSeekSimTime?: (time: number) => void;
 }
 
 export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
@@ -34,10 +39,15 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
   mode,
   jammer,
   onUpdateJammer,
+  isPlayingSim = false,
+  onTogglePlaySim,
+  simTime = 0.0,
+  simPhaseName,
+  onSeekSimTime,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState<number>(20);
+  const [zoom, setZoom] = useState<number>(22);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -114,11 +124,13 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      className={`relative w-full h-[600px] bg-[#f8fafc] border border-tactical-border overflow-hidden select-none font-mono shadow-none ${
+      className={`relative w-full ${
+        isLive ? 'h-[calc(100vh-118px)]' : 'h-[calc(100vh-68px)]'
+      } min-h-[580px] bg-[#f8fafc] dark:bg-slate-950 border border-tactical-border overflow-hidden select-none font-mono shadow-none ${
         isPanning ? 'cursor-grabbing' : 'cursor-grab'
       }`}
     >
-      {/* Tactical Light Grid Background */}
+      {/* Tactical Light & Dark Grid Background */}
       <div
         style={{
           backgroundPosition: `${panOffset.x}px ${panOffset.y}px`,
@@ -134,11 +146,11 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
 
       {/* Top Left HUD Overlay */}
       <div className="absolute top-3 left-3 z-30 flex flex-col gap-1.5 pointer-events-auto">
-        <div className="bg-white/95 border border-tactical-border px-3 py-1.5 text-xs flex items-center gap-2 shadow-sm">
+        <div className="bg-white/95 dark:bg-slate-900/95 border border-tactical-border px-3 py-1.5 text-xs flex items-center gap-2 shadow-sm">
           <Crosshair className="w-3.5 h-3.5 text-tactical-cyan" />
           <span className="text-tactical-textMuted">MAP DATUM:</span>
           <span className="text-tactical-textBright font-bold">REL-GRID TANK-00 (0,0)</span>
-          <span className="text-[10px] text-tactical-cyan ml-2 bg-sky-50 border border-sky-200 px-1.5 font-semibold">
+          <span className="text-[10px] text-tactical-cyan ml-2 bg-sky-50 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 px-1.5 font-semibold">
             PAN: ({Math.round(panOffset.x)}px, {Math.round(panOffset.y)}px)
           </span>
         </div>
@@ -149,8 +161,8 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
             onClick={() => setShowRings(!showRings)}
             className={`px-2 py-1 text-[11px] border font-semibold ${
               showRings
-                ? 'bg-white text-tactical-textBright border-tactical-border'
-                : 'bg-tactical-panel text-tactical-textMuted border-tactical-borderLight'
+                ? 'bg-white dark:bg-slate-900 text-tactical-textBright border-tactical-border'
+                : 'bg-tactical-panel dark:bg-slate-800 text-tactical-textMuted border-tactical-borderLight'
             }`}
           >
             RANGE RINGS
@@ -159,8 +171,8 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
             onClick={() => setShowSectors(!showSectors)}
             className={`px-2 py-1 text-[11px] border font-semibold ${
               showSectors
-                ? 'bg-white text-tactical-textBright border-tactical-border'
-                : 'bg-tactical-panel text-tactical-textMuted border-tactical-borderLight'
+                ? 'bg-white dark:bg-slate-900 text-tactical-textBright border-tactical-border'
+                : 'bg-tactical-panel dark:bg-slate-800 text-tactical-textMuted border-tactical-borderLight'
             }`}
           >
             ADHOC BEAMS
@@ -168,7 +180,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
           <button
             onClick={handleResetPan}
             title="Reset Pan & Center"
-            className="px-2 py-1 text-[11px] bg-white hover:bg-slate-100 border border-tactical-border text-slate-800 flex items-center gap-1 font-semibold"
+            className="px-2 py-1 text-[11px] bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-tactical-border text-slate-800 dark:text-slate-200 flex items-center gap-1 font-semibold"
           >
             <Focus className="w-3 h-3 text-tactical-cyan" />
             RE-CENTER
@@ -176,7 +188,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
           {!isLive && (
             <button
               onClick={onResetLayout}
-              className="px-2 py-1 text-[11px] bg-tactical-panel hover:bg-slate-200 border border-tactical-border text-tactical-textLight flex items-center gap-1 font-semibold"
+              className="px-2 py-1 text-[11px] bg-tactical-panel dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-tactical-border text-tactical-textLight flex items-center gap-1 font-semibold"
             >
               <RotateCcw className="w-3 h-3" />
               RESET SQUAD
@@ -186,17 +198,17 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
       </div>
 
       {/* Top Center Zoom Controls */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-white/95 border border-tactical-border p-1 shadow-sm pointer-events-auto">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-white/95 dark:bg-slate-900/95 border border-tactical-border p-1 shadow-sm pointer-events-auto">
         <button
           onClick={() => setZoom((prev) => Math.max(10, prev - 2))}
-          className="px-2 py-0.5 text-xs text-tactical-textMuted hover:text-tactical-textBright hover:bg-tactical-panel font-bold"
+          className="px-2 py-0.5 text-xs text-tactical-textMuted hover:text-tactical-textBright hover:bg-tactical-panel dark:hover:bg-slate-800 font-bold"
         >
           -
         </button>
         <span className="text-[10px] text-tactical-textLight px-1.5 font-bold">{zoom}x</span>
         <button
           onClick={() => setZoom((prev) => Math.min(36, prev + 2))}
-          className="px-2 py-0.5 text-xs text-tactical-textMuted hover:text-tactical-textBright hover:bg-tactical-panel font-bold"
+          className="px-2 py-0.5 text-xs text-tactical-textMuted hover:text-tactical-textBright hover:bg-tactical-panel dark:hover:bg-slate-800 font-bold"
         >
           +
         </button>
@@ -256,19 +268,96 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                   y1={center.cy}
                   x2={width}
                   y2={center.cy}
-                  stroke="#cbd5e1"
+                  stroke="#334155"
                   strokeWidth="1"
+                  strokeDasharray="4 4"
+                  opacity="0.5"
                 />
                 <line
                   x1={center.cx}
                   y1={0}
                   x2={center.cx}
                   y2={height}
-                  stroke="#cbd5e1"
+                  stroke="#334155"
                   strokeWidth="1"
+                  strokeDasharray="4 4"
+                  opacity="0.5"
                 />
 
-                {/* Render Obstacle Concrete Barriers */}
+                {/* Tactical Building Floorplan Blueprint (Dark CQB CQB Interior) */}
+                <g opacity="0.85">
+                  {/* ROOM 101 - STAGING / TOC ENTRY */}
+                  <rect
+                    x={getScreenCoords(-6, -4, width, height).cx}
+                    y={getScreenCoords(-6, 6, width, height).cy}
+                    width={13 * zoom}
+                    height={10 * zoom}
+                    fill="#0f172a"
+                    fillOpacity="0.4"
+                    stroke="#1e293b"
+                    strokeWidth="1.5"
+                    strokeDasharray="6 4"
+                  />
+                  <text
+                    x={getScreenCoords(-5.5, 5.2, width, height).cx}
+                    y={getScreenCoords(-5.5, 5.2, width, height).cy}
+                    fill="#475569"
+                    fontSize="9"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    ZONE ALPHA // TOC STAGING AREA
+                  </text>
+
+                  {/* CQB CORRIDOR 01 */}
+                  <rect
+                    x={getScreenCoords(1, 0, width, height).cx}
+                    y={getScreenCoords(1, 5.5, width, height).cy}
+                    width={7 * zoom}
+                    height={5.5 * zoom}
+                    fill="#0284c7"
+                    fillOpacity="0.04"
+                    stroke="#0369a1"
+                    strokeWidth="1"
+                    strokeDasharray="2 2"
+                  />
+                  <text
+                    x={getScreenCoords(1.5, 4.8, width, height).cx}
+                    y={getScreenCoords(1.5, 4.8, width, height).cy}
+                    fill="#0284c7"
+                    fontSize="8.5"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                    opacity="0.7"
+                  >
+                    CORRIDOR 01 (NSG INGRESS ROUTE)
+                  </text>
+
+                  {/* OBJECTIVE ROOM BRAVO (TARGET AREA BEHIND CONCRETE WALL) */}
+                  <rect
+                    x={getScreenCoords(8, 0, width, height).cx}
+                    y={getScreenCoords(8, 11, width, height).cy}
+                    width={11 * zoom}
+                    height={11 * zoom}
+                    fill="#1e1b4b"
+                    fillOpacity="0.35"
+                    stroke="#312e81"
+                    strokeWidth="1.5"
+                    strokeDasharray="6 4"
+                  />
+                  <text
+                    x={getScreenCoords(8.5, 10.2, width, height).cx}
+                    y={getScreenCoords(8.5, 10.2, width, height).cy}
+                    fill="#818cf8"
+                    fontSize="9"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    OBJECTIVE SECTOR BRAVO // ASSAULT TARGET
+                  </text>
+                </g>
+
+                {/* Render Obstacle Concrete Barriers with High-Tech Hazard Crosshatch */}
                 {displayWalls.map((wall) => {
                   const p1 = getScreenCoords(wall.x1, wall.y1, width, height);
                   const p2 = getScreenCoords(wall.x2, wall.y2, width, height);
@@ -278,38 +367,149 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                       className="pointer-events-auto cursor-pointer"
                       onClick={() => onToggleWall(wall.id)}
                     >
+                      {/* Outer Hazard Halo */}
                       <line
                         x1={p1.cx}
                         y1={p1.cy}
                         x2={p2.cx}
                         y2={p2.cy}
-                        stroke="#fee2e2"
-                        strokeWidth="14"
-                        strokeLinecap="round"
+                        stroke="#450a0a"
+                        strokeWidth="18"
+                        strokeLinecap="square"
+                        opacity="0.6"
                       />
+                      {/* Concrete Wall Core */}
                       <line
                         x1={p1.cx}
                         y1={p1.cy}
                         x2={p2.cx}
                         y2={p2.cy}
-                        stroke="#dc2626"
-                        strokeWidth="5"
-                        strokeLinecap="round"
+                        stroke="#991b1b"
+                        strokeWidth="8"
+                        strokeLinecap="square"
+                      />
+                      {/* Warning Stripe Center */}
+                      <line
+                        x1={p1.cx}
+                        y1={p1.cy}
+                        x2={p2.cx}
+                        y2={p2.cy}
+                        stroke="#f59e0b"
+                        strokeWidth="2.5"
+                        strokeDasharray="5 5"
                       />
                       <text
                         x={(p1.cx + p2.cx) / 2}
-                        y={(p1.cy + p2.cy) / 2 - 10}
-                        fill="#b91c1c"
-                        fontSize="9"
+                        y={(p1.cy + p2.cy) / 2 - 12}
+                        fill="#ef4444"
+                        fontSize="9.5"
                         textAnchor="middle"
                         fontFamily="monospace"
-                        fontWeight="bold"
+                        fontWeight="extrabold"
+                        className="tracking-wider drop-shadow"
                       >
-                        REINFORCED CONCRETE (-{wall.attenuationDb}dB)
+                        REINFORCED CONCRETE 0.35m (-{wall.attenuationDb}dB)
                       </text>
                     </g>
                   );
                 })}
+
+                {/* PHASE 2 SPECIAL: Fragmented Glowing Red Connection Line behind Concrete Wall */}
+                {mode === 'simulation' && simTime >= 4.5 && simTime < 8.5 && (
+                  <g>
+                    {(() => {
+                      const pTOC = getScreenCoords(0, 0, width, height);
+                      const alpha = nodes.find((n) => n.id === 'CMD-01');
+                      const pAlpha = getScreenCoords(alpha?.x ?? 14, alpha?.y ?? 7.8, width, height);
+                      return (
+                        <g>
+                          {/* Fragmented Flickering Red Line */}
+                          <line
+                            x1={pTOC.cx}
+                            y1={pTOC.cy}
+                            x2={pAlpha.cx}
+                            y2={pAlpha.cy}
+                            stroke="#ef4444"
+                            strokeWidth="3"
+                            strokeDasharray="8 6"
+                          >
+                            <animate
+                              attributeName="opacity"
+                              values="0.9;0.15;0.85;0.2;0.9"
+                              dur="0.5s"
+                              repeatCount="indefinite"
+                            />
+                          </line>
+                          <circle
+                            cx={(pTOC.cx + pAlpha.cx) / 2}
+                            cy={(pTOC.cy + pAlpha.cy) / 2}
+                            r="6"
+                            fill="#ef4444"
+                            className="animate-ping"
+                          />
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
+
+                {/* PHASE 4 SPECIAL: Snapped Brilliant 2-Hop Bounced Mesh Line around Wall Corner */}
+                {mode === 'simulation' && simTime >= 11.5 && (
+                  <g>
+                    {(() => {
+                      const pTOC = getScreenCoords(0, 0, width, height);
+                      const pCorner = getScreenCoords(8.0, 4.5, width, height);
+                      const alpha = nodes.find((n) => n.id === 'CMD-01');
+                      const pAlpha = getScreenCoords(alpha?.x ?? 14, alpha?.y ?? 7.8, width, height);
+
+                      return (
+                        <g>
+                          {/* Hop 1: TOC -> Corner Ghost */}
+                          <line
+                            x1={pTOC.cx}
+                            y1={pTOC.cy}
+                            x2={pCorner.cx}
+                            y2={pCorner.cy}
+                            stroke="#38bdf8"
+                            strokeWidth="4"
+                            strokeOpacity="0.9"
+                          />
+                          <line
+                            x1={pTOC.cx}
+                            y1={pTOC.cy}
+                            x2={pCorner.cx}
+                            y2={pCorner.cy}
+                            stroke="#ffffff"
+                            strokeWidth="1.5"
+                          />
+
+                          {/* Hop 2: Corner Ghost -> ALPHA-POINT (Bounced Around Wall) */}
+                          <line
+                            x1={pCorner.cx}
+                            y1={pCorner.cy}
+                            x2={pAlpha.cx}
+                            y2={pAlpha.cy}
+                            stroke="#38bdf8"
+                            strokeWidth="4"
+                            strokeOpacity="0.9"
+                          />
+                          <line
+                            x1={pCorner.cx}
+                            y1={pCorner.cy}
+                            x2={pAlpha.cx}
+                            y2={pAlpha.cy}
+                            stroke="#ffffff"
+                            strokeWidth="1.5"
+                          />
+
+                          {/* Corner Reflection Spark */}
+                          <circle cx={pCorner.cx} cy={pCorner.cy} r="8" fill="#38bdf8" fillOpacity="0.4" className="animate-ping" />
+                          <circle cx={pCorner.cx} cy={pCorner.cy} r="4" fill="#ffffff" />
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
 
                 {/* Render Active Ad-Hoc Multi-Hop Mesh Links */}
                 {links.map((link) => {
@@ -317,21 +517,29 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                   const toNode = nodes.find((n) => n.id === link.toId);
                   if (!fromNode || !toNode) return null;
 
-                  const p1 = getScreenCoords(fromNode.x, fromNode.y, width, height);
-                  const p2 = getScreenCoords(toNode.x, toNode.y, width, height);
+                  const fromX = fromNode.isOffline ? (fromNode.lastOnlineX ?? fromNode.x) : fromNode.x;
+                  const fromY = fromNode.isOffline ? (fromNode.lastOnlineY ?? fromNode.y) : fromNode.y;
+                  const toX = toNode.isOffline ? (toNode.lastOnlineX ?? toNode.x) : toNode.x;
+                  const toY = toNode.isOffline ? (toNode.lastOnlineY ?? toNode.y) : toNode.y;
 
-                  let strokeColor = '#0284c7'; // Active Ad-Hoc Mesh Cobalt
-                  let strokeDash = 'none';
-                  let strokeWidth = 2.5;
+                  const p1 = getScreenCoords(fromX, fromY, width, height);
+                  const p2 = getScreenCoords(toX, toY, width, height);
 
-                  if (link.status === 'degraded') {
-                    strokeColor = '#d97706';
-                    strokeDash = '6 3';
-                    strokeWidth = 2;
-                  } else if (link.status === 'critical' || link.status === 'broken') {
-                    strokeColor = '#dc2626';
-                    strokeDash = '4 3';
-                    strokeWidth = 1.5;
+                  const isOfflineLink = fromNode.isOffline || toNode.isOffline;
+                  let strokeColor = isOfflineLink ? '#dc2626' : '#0284c7';
+                  let strokeDash = isOfflineLink ? '4 4' : 'none';
+                  let strokeWidth = isOfflineLink ? 1.5 : 2.5;
+
+                  if (!isOfflineLink) {
+                    if (link.status === 'degraded') {
+                      strokeColor = '#d97706';
+                      strokeDash = '6 3';
+                      strokeWidth = 2;
+                    } else if (link.status === 'critical' || link.status === 'broken') {
+                      strokeColor = '#dc2626';
+                      strokeDash = '4 3';
+                      strokeWidth = 1.5;
+                    }
                   }
 
                   const midX = (p1.cx + p2.cx) / 2;
@@ -347,118 +555,136 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                         stroke={strokeColor}
                         strokeWidth={strokeWidth}
                         strokeDasharray={strokeDash}
-                        strokeOpacity={link.status === 'broken' ? 0.35 : 0.9}
+                        strokeOpacity={isOfflineLink || link.status === 'broken' ? 0.35 : 0.9}
                       />
-                      {/* Directional Ad-Hoc Hop Arrow */}
-                      <circle cx={(p1.cx * 0.4 + p2.cx * 0.6)} cy={(p1.cy * 0.4 + p2.cy * 0.6)} r="3" fill={strokeColor} />
+                      {!isOfflineLink && (
+                        <circle cx={(p1.cx * 0.4 + p2.cx * 0.6)} cy={(p1.cy * 0.4 + p2.cy * 0.6)} r="3" fill={strokeColor} />
+                      )}
                       
                       <rect
-                        x={midX - 32}
+                        x={midX - 34}
                         y={midY - 9}
-                        width="64"
+                        width="68"
                         height="18"
-                        fill="#ffffff"
+                        fill="#0f172a"
                         stroke={strokeColor}
                         strokeWidth="1"
+                        rx="2"
                       />
                       <text
                         x={midX}
                         y={midY + 3}
-                        fill={strokeColor}
+                        fill={isOfflineLink ? '#ef4444' : '#38bdf8'}
                         fontSize="8.5"
                         textAnchor="middle"
                         fontFamily="monospace"
                         fontWeight="bold"
                       >
-                        {link.sinrDb}dB ({link.distanceMeters}m)
+                        {isOfflineLink ? 'SEVERED' : `${link.sinrDb}dB (${link.distanceMeters}m)`}
                       </text>
                     </g>
                   );
                 })}
 
-                {/* Render Ghost Nodes (Ad-Hoc Network Healing Projection) */}
+                {/* Render Ghost Nodes (Pulsing Green Holographic Relay at Corner in Phase 3/4) */}
                 {ghostNodes.map((ghost) => {
-                  const curr = getScreenCoords(ghost.currentX, ghost.currentY, width, height);
                   const opt = getScreenCoords(ghost.optimalX, ghost.optimalY, width, height);
 
                   return (
-                    <g key={`ghost-${ghost.targetNodeId}`}>
-                      <line
-                        x1={curr.cx}
-                        y1={curr.cy}
-                        x2={opt.cx}
-                        y2={opt.cy}
-                        stroke="#dc2626"
-                        strokeWidth="2.5"
-                        strokeDasharray="6 4"
-                      />
+                    <g key={`ghost-${ghost.targetNodeId}`} transform={`translate(${opt.cx}, ${opt.cy})`}>
+                      {/* Concentric Green Sonar Expanding Waves */}
+                      <circle r="36" fill="none" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
+                      <circle r="24" fill="none" stroke="#10b981" strokeWidth="1.5" opacity="0.6" className="animate-ping" />
+                      <circle r="12" fill="#10b981" fillOpacity="0.25" stroke="#10b981" strokeWidth="2" />
+                      <circle r="4" fill="#10b981" />
 
-                      <circle
-                        cx={opt.cx}
-                        cy={opt.cy}
-                        r="18"
-                        fill="none"
-                        stroke="#dc2626"
-                        strokeWidth="1.5"
-                        strokeDasharray="3 2"
-                      />
-                      <circle
-                        cx={opt.cx}
-                        cy={opt.cy}
-                        r="12"
-                        fill="#fee2e2"
-                        fillOpacity="0.8"
-                        stroke="#dc2626"
-                        strokeWidth="2"
-                      />
-                      <circle cx={opt.cx} cy={opt.cy} r="4" fill="#dc2626" />
-
-                      <g transform={`translate(${opt.cx + 18}, ${opt.cy - 12})`}>
+                      {/* Ghost Waypoint Hologram Badge */}
+                      <g transform="translate(18, -14)">
                         <rect
                           x="0"
                           y="0"
                           width="185"
-                          height="36"
-                          fill="#ffffff"
-                          stroke="#dc2626"
+                          height="34"
+                          fill="#064e3b"
+                          stroke="#10b981"
                           strokeWidth="1.5"
+                          rx="2"
                         />
                         <text
                           x="8"
-                          y="14"
-                          fill="#991b1b"
-                          fontSize="10"
+                          y="13"
+                          fill="#a7f3d0"
+                          fontSize="9.5"
                           fontFamily="monospace"
                           fontWeight="bold"
                         >
-                          GHOST WAYPOINT: {ghost.targetCallsign}
+                          ✦ GHOST RELAY: {ghost.targetCallsign}
                         </text>
                         <text
                           x="8"
-                          y="28"
-                          fill="#dc2626"
-                          fontSize="9"
+                          y="26"
+                          fill="#34d399"
+                          fontSize="8.5"
                           fontFamily="monospace"
                           fontWeight="bold"
                         >
-                          {ghost.shiftCardinal} (+{ghost.predictedSinrGainDb}dB SINR)
+                          WALL CORNER (8.0, 4.5) // +22.4dB HEAL
                         </text>
                       </g>
                     </g>
                   );
                 })}
 
-                {/* Conformal Beam Sector Cones (AIMED EXACTLY AT DIRECT AD-HOC UPSTREAM PARENT) */}
+                {/* Conformal Beam Sector Cones & 360-Degree Sweep on Disconnected Nodes */}
                 {showSectors &&
                   nodes.map((node) => {
                     if (node.isAnchor) return null;
-                    const p = getScreenCoords(node.x, node.y, width, height);
-                    const parent = nodes.find((n) => n.id === node.nextHopId) || nodes[0];
-                    const parentCoords = getScreenCoords(parent.x, parent.y, width, height);
-                    
-                    // Exact angle towards direct upstream ad-hoc mesh parent
-                    const dx = parentCoords.cx - p.cx;
-                    const dy = parentCoords.cy - p.cy;
+                    const posX = node.isOffline ? (node.lastOnlineX ?? node.x) : node.x;
+                    const posY = node.isOffline ? (node.lastOnlineY ?? node.y) : node.y;
+                    const p = getScreenCoords(posX, posY, width, height);
+
+                    if (node.isOffline) {
+                      return (
+                        <g key={`beam-sweep-${node.id}`} transform={`translate(${p.cx}, ${p.cy})`}>
+                          <circle r="48" fill="none" stroke="#ef4444" strokeWidth="1" strokeDasharray="3 3" opacity="0.45" />
+                          <circle r="28" fill="none" stroke="#ef4444" strokeWidth="0.8" opacity="0.35" />
+                          <g>
+                            <path
+                              d="M 0 0 L 48 -20 A 52 52 0 0 1 48 20 Z"
+                              fill="#ef4444"
+                              fillOpacity="0.25"
+                              stroke="#ef4444"
+                              strokeWidth="1.4"
+                            />
+                            <line x1="0" y1="0" x2="50" y2="0" stroke="#ef4444" strokeWidth="1.8" opacity="0.8" />
+                            <animateTransform
+                              attributeName="transform"
+                              type="rotate"
+                              from="0"
+                              to="360"
+                              dur="2.4s"
+                              repeatCount="indefinite"
+                            />
+                          </g>
+                        </g>
+                      );
+                    }
+
+                    let targetNode = nodes.find((n) => n.id === node.nextHopId && !n.isOffline);
+                    if (!targetNode) {
+                      const peerLink = links.find((l) => (l.sourceId === node.id || l.targetId === node.id) && l.active);
+                      if (peerLink) {
+                        const peerId = peerLink.sourceId === node.id ? peerLink.targetId : peerLink.sourceId;
+                        targetNode = nodes.find((n) => n.id === peerId);
+                      }
+                    }
+                    if (!targetNode) {
+                      targetNode = nodes.find((n) => n.isAnchor) || nodes[0];
+                    }
+
+                    const targetCoords = getScreenCoords(targetNode.x, targetNode.y, width, height);
+                    const dx = targetCoords.cx - p.cx;
+                    const dy = targetCoords.cy - p.cy;
                     const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
 
                     return (
@@ -467,13 +693,14 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                         transform={`translate(${p.cx}, ${p.cy}) rotate(${angleDeg})`}
                       >
                         <path
-                          d="M 0 0 L 38 -15 A 42 42 0 0 1 38 15 Z"
+                          d="M 0 0 L 44 -18 A 48 48 0 0 1 44 18 Z"
                           fill="#0284c7"
-                          fillOpacity="0.18"
+                          fillOpacity="0.22"
                           stroke="#0284c7"
-                          strokeWidth="1.2"
-                          strokeDasharray="2 2"
+                          strokeWidth="1.4"
+                          strokeDasharray="3 2"
                         />
+                        <line x1="0" y1="0" x2="46" y2="0" stroke="#38bdf8" strokeWidth="1.5" opacity="0.9" />
                       </g>
                     );
                   })}
@@ -488,9 +715,14 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
         nodes.map((node) => {
           const width = containerRef.current?.clientWidth || 800;
           const height = containerRef.current?.clientHeight || 600;
-          const coords = getScreenCoords(node.x, node.y, width, height);
+
+          const posX = node.isOffline ? (node.lastOnlineX ?? node.x) : node.x;
+          const posY = node.isOffline ? (node.lastOnlineY ?? node.y) : node.y;
+
+          const coords = getScreenCoords(posX, posY, width, height);
           const isSelected = selectedNodeId === node.id;
           const isDragging = draggingNodeId === node.id;
+          const isOffline = !!node.isOffline;
 
           return (
             <div
@@ -502,71 +734,183 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 top: `${coords.cy}px`,
                 transform: 'translate(-50%, -50%)',
               }}
-              className={`absolute z-20 flex flex-col items-center select-none ${
-                isLive ? 'cursor-pointer' : 'cursor-grab'
-              } ${isDragging ? 'cursor-grabbing scale-110 shadow-lg' : ''}`}
+              className={`absolute z-20 flex flex-col items-center select-none transition-transform ${
+                isLive || isOffline ? 'cursor-pointer' : 'cursor-grab'
+              } ${isDragging ? 'cursor-grabbing scale-115 shadow-xl z-30' : ''}`}
             >
-              {/* Node Marker Box */}
+              {/* Pulsing Alert Ring for Disconnected Nodes (Red Circle at Last Online Pos) */}
+              {isOffline && (
+                <div className="absolute -inset-3 rounded-full border-2 border-red-500/80 animate-ping pointer-events-none" />
+              )}
+
+              {/* Node Marker: Circle with Translucent Blue Hologram */}
               <div
-                className={`relative flex items-center justify-center w-8 h-8 border transition-all ${
-                  node.isAnchor
-                    ? 'bg-slate-900 border-slate-900 text-white font-bold'
+                className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all shadow-md backdrop-blur-sm ${
+                  isOffline
+                    ? 'bg-red-500/25 border-2 border-red-600 text-red-500 shadow-red-500/20 ring-2 ring-red-500/40'
+                    : node.isAnchor
+                    ? 'bg-slate-950 border-2 border-sky-400 text-white font-bold ring-2 ring-sky-400/30'
                     : isSelected
-                    ? 'bg-white border-2 border-slate-900 text-slate-950 font-bold'
-                    : 'bg-white border border-tactical-border text-slate-800 hover:border-slate-800'
+                    ? 'bg-sky-500/35 border-2 border-sky-400 text-sky-100 font-bold ring-2 ring-sky-400/60 shadow-sky-500/40'
+                    : 'bg-sky-500/20 hover:bg-sky-500/30 border-2 border-sky-400 text-sky-200'
                 }`}
               >
                 {node.isAnchor ? (
-                  <Shield className="w-4 h-4 text-white" />
+                  <Shield className="w-5 h-5 text-sky-400" />
                 ) : (
-                  <span className="text-[10px] font-bold">
+                  <span className="text-[10px] font-black">
                     {node.id.replace('CMD-', 'C')}
                   </span>
                 )}
 
                 {/* Status Dot */}
                 <div
-                  className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-white ${
-                    node.battery > 50
-                      ? 'bg-tactical-green'
-                      : node.battery > 20
-                      ? 'bg-tactical-amber'
-                      : 'bg-tactical-crimson animate-ping'
+                  className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 shadow-sm ${
+                    isOffline
+                      ? 'bg-red-600 animate-pulse ring-1 ring-red-400'
+                      : node.battery > 50
+                      ? 'bg-emerald-500 ring-1 ring-emerald-400'
+                      : 'bg-amber-500 ring-1 ring-amber-400'
                   }`}
+                  title={isOffline ? 'Connection Severed (Scanning)' : 'Connected / Online'}
                 />
               </div>
 
-              {/* Callsign Tag with Hop Count */}
-              <div className="mt-1 bg-white border border-tactical-border px-1.5 py-0.5 text-[8.5px] text-center font-bold tracking-tight whitespace-nowrap shadow-none">
-                <span className="text-slate-900">{node.callsign}</span>
-                <span className="text-sky-700 ml-1">
-                  [{node.isAnchor ? 'TOC' : `${node.hopCount ?? 1}H➔${node.nextHopId?.replace('CMD-', 'C')}`}]
+              {/* Callsign Tag */}
+              <div
+                className={`mt-1.5 px-2 py-0.5 text-[8.5px] text-center font-bold tracking-tight whitespace-nowrap shadow-sm border rounded-sm ${
+                  isOffline
+                    ? 'bg-red-950/90 border-red-500 text-red-300'
+                    : 'bg-slate-900/95 border-tactical-border text-white'
+                }`}
+              >
+                <span>{node.displayName || node.callsign}</span>
+                <span className={`ml-1 ${isOffline ? 'text-red-400' : 'text-sky-400'}`}>
+                  {isOffline
+                    ? '[SEVERED]'
+                    : node.isAnchor
+                    ? '[TOC]'
+                    : `[${node.hopCount ?? 1}H➔${node.nextHopId?.replace('CMD-', 'C')}]`}
                 </span>
               </div>
             </div>
           );
         })}
 
-      {/* Bottom Floating Tactical Banner */}
-      <div className="absolute bottom-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
-        <div className="bg-white/95 border border-tactical-border px-3 py-1.5 text-[11px] text-slate-600 flex items-center gap-2 pointer-events-auto shadow-sm">
-          <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-tactical-green animate-pulse' : 'bg-sky-600'}`} />
-          <span className="font-medium">
-            {isLive
-              ? 'LIVE HW MODE: Ingesting real received ESP32 packets only. (Simulation tools locked)'
-              : 'PANNING ACTIVE: Click & drag background to pan battlefield. Beams dynamically track ad-hoc mesh parents.'}
-          </span>
-        </div>
-
-        {ghostNodes.length > 0 && (
-          <div className="bg-red-50 border border-tactical-crimson px-3 py-1.5 text-xs text-red-800 font-bold flex items-center gap-2 pointer-events-auto shadow-sm">
-            <AlertTriangle className="w-4 h-4 text-tactical-crimson" />
-            <span>
-              {ghostNodes.length} AD-HOC GHOST REPOSITIONING WAYPOINT(S) PROJECTED
+      {/* TOP CENTER: 15-SECOND NSG TACTICAL CQB MISSION HUD */}
+      {!isLive && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-1">
+          <div className="bg-slate-950/90 border border-tactical-border px-4 py-1.5 rounded-sm flex items-center gap-3 shadow-xl backdrop-blur-md">
+            <span className="text-[10px] font-black bg-red-950 text-red-400 border border-red-800 px-2 py-0.5">
+              NSG 51 SAG // CQB
+            </span>
+            <span className="text-xs font-bold text-white tracking-wide">
+              {simPhaseName || '15s TACTICAL CQB GHOST RELAY SIMULATION'}
+            </span>
+            <span className="text-xs font-mono font-extrabold text-tactical-cyan bg-sky-950/80 border border-sky-800 px-2 py-0.5">
+              {simTime.toFixed(1)}s / 15.0s
             </span>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* BOTTOM CENTER: 15-SECOND CINEMATIC MISSION TIMELINE CONTROLLER */}
+      {!isLive && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 bg-slate-950/95 border border-slate-800 p-2.5 rounded-sm shadow-2xl backdrop-blur-md max-w-2xl w-[95%] sm:w-[650px]">
+          {/* Progress Timeline Bar with Phase Markers */}
+          <div className="w-full flex flex-col gap-1">
+            <div className="flex justify-between text-[9px] font-mono text-slate-400 uppercase">
+              <span
+                onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
+                className={`cursor-pointer hover:text-white ${simTime < 4.5 ? 'text-sky-400 font-bold' : ''}`}
+              >
+                01: INGRESS (0s)
+              </span>
+              <span
+                onClick={() => onSeekSimTime && onSeekSimTime(4.5)}
+                className={`cursor-pointer hover:text-white ${simTime >= 4.5 && simTime < 8.5 ? 'text-red-400 font-bold' : ''}`}
+              >
+                02: SEVERED (4.5s)
+              </span>
+              <span
+                onClick={() => onSeekSimTime && onSeekSimTime(8.5)}
+                className={`cursor-pointer hover:text-white ${simTime >= 8.5 && simTime < 11.5 ? 'text-amber-400 font-bold' : ''}`}
+              >
+                03: GHOST DROP (8.5s)
+              </span>
+              <span
+                onClick={() => onSeekSimTime && onSeekSimTime(11.5)}
+                className={`cursor-pointer hover:text-white ${simTime >= 11.5 ? 'text-emerald-400 font-bold' : ''}`}
+              >
+                04: HEALED (11.5s)
+              </span>
+            </div>
+
+            {/* Interactive Scrubber Track */}
+            <div
+              onClick={(e) => {
+                if (!onSeekSimTime) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const pct = Math.max(0, Math.min(1, clickX / rect.width));
+                onSeekSimTime(parseFloat((pct * 15.0).toFixed(1)));
+              }}
+              className="relative w-full h-2.5 bg-slate-800 rounded-full cursor-pointer overflow-hidden border border-slate-700"
+            >
+              <div
+                style={{ width: `${(simTime / 15.0) * 100}%` }}
+                className="h-full bg-gradient-to-r from-sky-500 via-amber-500 to-emerald-500 transition-all duration-75"
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons Row */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={onTogglePlaySim}
+              className={`px-5 py-1.5 flex items-center gap-2 text-xs font-black tracking-wider uppercase rounded-sm border shadow-md transition-all ${
+                isPlayingSim
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400'
+                  : 'bg-tactical-cyan hover:bg-sky-600 text-white border-sky-400'
+              }`}
+            >
+              {isPlayingSim ? (
+                <>
+                  <Pause className="w-3.5 h-3.5 fill-current" />
+                  <span>PAUSE (15s LOOP)</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>RUN NSG SIMULATION</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold uppercase rounded-sm border border-slate-700 flex items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>RESTART</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Floating Tactical Banner */}
+      <div className="absolute bottom-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
+        <div className="bg-slate-900/95 border border-tactical-border px-3 py-1.5 text-[11px] text-slate-300 flex items-center gap-2 pointer-events-auto shadow-sm">
+          <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-sky-500'}`} />
+          <span className="font-medium">
+            {isLive
+              ? 'LIVE HW MODE: Ingesting real received ESP32 packets only.'
+              : 'NSG 51 SAG CQB: Top-down dark building floorplan • Operatives moving behind concrete barrier.'}
+          </span>
+        </div>
       </div>
     </div>
   );
 };
+
+

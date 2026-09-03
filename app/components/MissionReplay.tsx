@@ -41,12 +41,12 @@ export const MissionReplay: React.FC<MissionReplayProps> = ({
   };
 
   return (
-    <div className="bg-white border border-tactical-border font-mono text-xs select-none p-2.5 flex items-center justify-between gap-3 shadow-none">
+    <div className="bg-white dark:bg-slate-900 border border-tactical-border font-mono text-xs select-none p-2.5 flex items-center justify-between gap-3 shadow-none">
       <div className="flex items-center gap-2">
         <HardDrive className="w-4 h-4 text-tactical-cyan" />
         <div>
           <div className="text-[11px] font-bold text-tactical-textBright">
-            BROWSER-NATIVE BLACKBOX (INDEXEDDB)
+            MISSION TELEMETRY BLACKBOX (INDEXEDDB)
           </div>
           <div className="text-[9px] text-tactical-textMuted font-medium">
             Zero-latency offline mission logging | {currentPacketCount} telemetry frames stored

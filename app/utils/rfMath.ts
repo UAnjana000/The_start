@@ -195,17 +195,22 @@ export function computeAdHocMeshRouting(
   updatedNodes: TacticalNode[];
   activeMeshLinks: NodeLink[];
 } {
-  const anchorNode = nodes.find(n => n.isAnchor || n.id === 'TANK-00') ?? nodes[0];
+  const visibleNodes = nodes.filter(n => !n.isHidden);
+  const anchorNode = visibleNodes.find(n => n.isAnchor || n.id === 'TANK-00') ?? visibleNodes[0];
   const nodeMap = new Map<string, TacticalNode>();
-  nodes.forEach(n => nodeMap.set(n.id, { ...n, hopCount: 0, routePath: [n.id] }));
+  visibleNodes.forEach(n => nodeMap.set(n.id, { ...n, hopCount: 0, routePath: [n.id] }));
 
   // Evaluate all pairwise candidate links (range < 24m)
   const candidateEdges: { fromId: string; toId: string; link: ReturnType<typeof calculateLinkMetrics> }[] = [];
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = 0; j < nodes.length; j++) {
+  for (let i = 0; i < visibleNodes.length; i++) {
+    for (let j = 0; j < visibleNodes.length; j++) {
       if (i === j) continue;
-      const n1 = nodes[i];
-      const n2 = nodes[j];
+      const n1 = visibleNodes[i];
+      const n2 = visibleNodes[j];
+      
+      // Offline nodes cannot transmit or relay data
+      if (n1.isOffline || n2.isOffline) continue;
+
       const dist = calculateDistance(n1.x, n1.y, n2.x, n2.y);
       if (dist <= 26.0) {
         const link = calculateLinkMetrics(n1, n2, walls, jammer);
@@ -219,10 +224,12 @@ export function computeAdHocMeshRouting(
   const previous = new Map<string, string>();
   const linkToParent = new Map<string, ReturnType<typeof calculateLinkMetrics>>();
 
-  nodes.forEach(n => distances.set(n.id, Infinity));
-  distances.set(anchorNode.id, 0);
+  visibleNodes.forEach(n => distances.set(n.id, Infinity));
+  if (anchorNode) {
+    distances.set(anchorNode.id, 0);
+  }
 
-  const unvisited = new Set(nodes.map(n => n.id));
+  const unvisited = new Set(visibleNodes.filter(n => !n.isOffline).map(n => n.id));
 
   while (unvisited.size > 0) {
     let currentId: string | null = null;
@@ -256,8 +263,24 @@ export function computeAdHocMeshRouting(
   const updatedNodes: TacticalNode[] = [];
 
   for (const node of nodes) {
+    if (node.isHidden) {
+      updatedNodes.push(node);
+      continue;
+    }
+
     if (node.id === anchorNode.id) {
       updatedNodes.push({ ...node, hopCount: 0, nextHopId: 'TOC', routePath: ['TANK-00'], bottleneckSinrDb: 40.0 });
+      continue;
+    }
+
+    if (node.isOffline) {
+      updatedNodes.push({
+        ...node,
+        hopCount: 99,
+        nextHopId: 'OFFLINE',
+        routePath: [node.id, 'BROKEN'],
+        bottleneckSinrDb: 0.0,
+      });
       continue;
     }
 

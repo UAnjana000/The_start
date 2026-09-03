@@ -43,7 +43,7 @@ export const VideoPiP: React.FC<VideoPiPProps> = ({
   onSelectNode,
   mode,
 }) => {
-  const [minimized, setMinimized] = useState(false);
+  const [minimized, setMinimized] = useState(true);
   const [nvgMode, setNvgMode] = useState(true);
   const [position, setPosition] = useState({ x: 24, y: 76 });
   const [isDragging, setIsDragging] = useState(false);

@@ -7,6 +7,11 @@
   --foreground: #0f172a;
 }
 
+.dark {
+  --background: #020617;
+  --foreground: #f8fafc;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
@@ -15,7 +20,7 @@ body {
   user-select: none;
 }
 
-/* Tactical Light Grid Background (Palantir Foundry Technical Paper Grid) */
+/* Tactical Light & Dark Grid Background */
 .tactical-grid {
   background-size: 32px 32px;
   background-image: 
@@ -23,11 +28,23 @@ body {
     linear-gradient(to bottom, rgba(148, 163, 184, 0.25) 1px, transparent 1px);
 }
 
+.dark .tactical-grid {
+  background-image: 
+    linear-gradient(to right, rgba(51, 65, 85, 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(51, 65, 85, 0.4) 1px, transparent 1px);
+}
+
 .tactical-subgrid {
   background-size: 8px 8px;
   background-image: 
     linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+}
+
+.dark .tactical-subgrid {
+  background-image: 
+    linear-gradient(to right, rgba(51, 65, 85, 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(51, 65, 85, 0.2) 1px, transparent 1px);
 }
 
 /* Tactical CRT / Scanline effect for video PiP */

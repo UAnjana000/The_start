@@ -22,21 +22,21 @@ export const TelemetryTable: React.FC<TelemetryTableProps> = ({
   mode,
 }) => {
   return (
-    <div className="bg-white border border-tactical-border font-mono text-xs overflow-hidden flex flex-col h-full select-none shadow-none">
+    <div className="bg-white dark:bg-slate-900 border border-tactical-border font-mono text-xs overflow-hidden flex flex-col h-full select-none shadow-none">
       {/* Header */}
-      <div className="border-b border-tactical-border px-3 py-2 bg-tactical-panel flex items-center justify-between">
+      <div className="border-b border-tactical-border px-3 py-2 bg-tactical-panel dark:bg-slate-800/80 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Signal className="w-3.5 h-3.5 text-tactical-cyan" />
           <span className="font-bold tracking-wider text-tactical-textBright">
-            {mode === 'live' ? 'LIVE ESP32 TELEMETRY INGRESS' : 'AD-HOC MANET ROUTING & TELEMETRY STREAM'}
+            {mode === 'live' ? 'LIVE ESP32 TELEMETRY' : 'TELEMETRY STREAM'}
           </span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-tactical-textMuted font-semibold">
-          <span className="bg-white px-2 py-0.5 border border-tactical-border">
+          <span className="bg-white dark:bg-slate-900 px-2 py-0.5 border border-tactical-border">
             PROTOCOL: B.A.T.M.A.N. ADV / OLSR
           </span>
-          <span className="bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 font-bold">
-            MULTI-HOP AD-HOC MESH
+          <span className="bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2 py-0.5 font-bold">
+            MULTI-HOP MESH
           </span>
         </div>
       </div>

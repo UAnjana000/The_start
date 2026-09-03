@@ -4,6 +4,7 @@ export type LinkStatus = 'healthy' | 'degraded' | 'critical' | 'broken';
 export interface TacticalNode {
   id: string;
   callsign: string;
+  displayName?: string;
   role: NodeRole;
   x: number; // relative coordinate in meters (TANK-00 is at 0,0)
   y: number;
@@ -17,6 +18,11 @@ export interface TacticalNode {
   nextHopId?: string; // Direct upstream mesh relay
   routePath?: string[]; // Full breadcrumb chain (e.g. ["CMD-05", "CMD-03", "CMD-01", "TANK-00"])
   bottleneckSinrDb?: number;
+  isOffline?: boolean; // True when node loses connection
+  lastOnlineX?: number; // Last known coordinates before connection loss
+  lastOnlineY?: number;
+  lastOnlineTimestamp?: number;
+  isHidden?: boolean; // When deleted/hidden from primary view
 }
 
 export interface NodeLink {
@@ -77,3 +83,7 @@ export interface TelemetryPacket {
 }
 
 export type OperationalMode = 'live' | 'simulation';
+export type TabKey = 'home' | 'dashboard' | 'simulate' | 'nodes' | 'alerts' | 'data-graphs' | 'settings';
+export type LanguageKey = 'en' | 'hi' | 'es' | 'fr' | 'de';
+export type ThemeMode = 'light' | 'dark';
+
