@@ -234,7 +234,7 @@ export default function TacticalDashboardPage() {
       {
         id: 'CMD-06',
         callsign: 'CMD-06',
-        displayName: 'CMD-06 (FLANK) [1H➔TANK-00]',
+        displayName: t < 5.0 ? 'CMD-06 (FLANK) [1H➔TANK-00]' : 'CMD-06 (FLANK) [2H➔C02]',
         role: 'pointman',
         x: c06X,
         y: c06Y,
@@ -248,7 +248,7 @@ export default function TacticalDashboardPage() {
       {
         id: 'CMD-02',
         callsign: 'BRAVO-SUPPORT',
-        displayName: 'BRAVO-SUPPORT [2H➔C06]',
+        displayName: 'BRAVO-SUPPORT [1H➔TANK-00]',
         role: 'assault',
         x: c02X,
         y: c02Y,
@@ -276,7 +276,7 @@ export default function TacticalDashboardPage() {
       {
         id: 'CMD-01',
         callsign: 'ALPHA-POINT',
-        displayName: 'ALPHA-POINT [2H➔C03]',
+        displayName: t >= 10.0 ? 'ALPHA-POINT [4H➔C03]' : 'ALPHA-POINT [BLOCKED]',
         role: 'pointman',
         x: 10.0,
         y: -5.0,
@@ -284,16 +284,16 @@ export default function TacticalDashboardPage() {
         activeSector: 1,
         txPowerDbm: 20.0,
         noiseFloorDbm: -95.0,
-        isOffline: t < 10.0,
+        isOffline: false,
         lastOnlineX: 10.0,
         lastOnlineY: -5.0,
         hopCount: t >= 10.0 ? 4 : 99,
-        nextHopId: t >= 10.0 ? 'CMD-03' : 'OFFLINE',
+        nextHopId: t >= 10.0 ? 'CMD-03' : undefined,
       },
       {
         id: 'CMD-03',
         callsign: 'CHARLIE-CORNER',
-        displayName: 'CHARLIE-CORNER [2H➔C04]',
+        displayName: t >= 10.0 ? 'CHARLIE-CORNER [3H➔C05]' : 'CHARLIE-CORNER [2H➔C05]',
         role: 'breacher',
         x: 17.5,
         y: -2.5,
@@ -301,13 +301,13 @@ export default function TacticalDashboardPage() {
         activeSector: 4,
         txPowerDbm: 20.0,
         noiseFloorDbm: -95.0,
-        hopCount: 2,
+        hopCount: t >= 10.0 ? 3 : 2,
         nextHopId: 'CMD-05',
       },
       {
         id: 'CMD-05',
         callsign: 'CMD-05',
-        displayName: 'CMD-05 (UPPER) [3H➔C03]',
+        displayName: t >= 10.0 ? 'CMD-05 (UPPER) [2H➔C04]' : 'CMD-05 (UPPER) [3H➔C03]',
         role: 'pointman',
         x: 18.5,
         y: 7.0,
@@ -375,13 +375,13 @@ export default function TacticalDashboardPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const currentNodes = mode === 'live'
     ? liveNodes
-    : (activeTab === 'simulate' && isPlayingSim ? currentSimNodes : simNodes);
+    : (activeTab === 'simulate' ? currentSimNodes : simNodes);
   const visibleCurrentNodes = currentNodes.filter((n) => !n.isHidden);
 
   // Recalculate full Ad-Hoc MANET multi-hop topology, links, and ghost nodes
   const updateTopology = useCallback(
     (activeSquad: TacticalNode[], currentWalls: ObstacleWall[], currentJammer: JammerState, currentMode: OperationalMode) => {
-      if (currentMode === 'simulation' && activeTab === 'simulate' && isPlayingSim) {
+      if (currentMode === 'simulation' && activeTab === 'simulate') {
         // In 15s automated NSG simulation, compute dynamic link status based on simTime
         const t = simTime;
         const simLinks: NodeLink[] = [];
@@ -618,12 +618,12 @@ export default function TacticalDashboardPage() {
         setTotalPacketsLogged((prev) => prev + 1);
       });
     },
-    []
+    [simTime, activeTab, currentSimGhostNodes]
   );
 
   useEffect(() => {
     updateTopology(currentNodes, walls, jammer, mode);
-  }, [currentNodes, walls, jammer, mode, updateTopology]);
+  }, [currentNodes, walls, jammer, mode, simTime, activeTab, updateTopology]);
 
   // Ingest Live Hardware Packet (with offline/disconnect support)
   const ingestLivePacket = (
