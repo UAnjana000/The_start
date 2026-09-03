@@ -672,9 +672,9 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
 
                     let targetNode = nodes.find((n) => n.id === node.nextHopId && !n.isOffline);
                     if (!targetNode) {
-                      const peerLink = links.find((l) => (l.sourceId === node.id || l.targetId === node.id) && l.active);
+                      const peerLink = links.find((l) => (l.fromId === node.id || l.toId === node.id) && l.status !== 'broken');
                       if (peerLink) {
-                        const peerId = peerLink.sourceId === node.id ? peerLink.targetId : peerLink.sourceId;
+                        const peerId = peerLink.fromId === node.id ? peerLink.toId : peerLink.fromId;
                         targetNode = nodes.find((n) => n.id === peerId);
                       }
                     }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { NavbarC2 } from './components/NavbarC2';
 import { HomeTab } from './components/HomeTab';
 import { NodesTab } from './components/NodesTab';
