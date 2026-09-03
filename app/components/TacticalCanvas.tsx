@@ -185,33 +185,36 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
             <Focus className="w-3 h-3 text-tactical-cyan" />
             RE-CENTER
           </button>
+
+          {/* Integrated Zoom Controls */}
+          <div className="flex items-center gap-0.5 bg-white dark:bg-slate-900 border border-tactical-border px-1 py-0.5">
+            <button
+              onClick={() => setZoom((prev) => Math.max(10, prev - 2))}
+              className="px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold"
+              title="Zoom Out"
+            >
+              -
+            </button>
+            <span className="text-[10px] text-slate-900 dark:text-white px-1 font-bold">{zoom}x</span>
+            <button
+              onClick={() => setZoom((prev) => Math.min(36, prev + 2))}
+              className="px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold"
+              title="Zoom In"
+            >
+              +
+            </button>
+          </div>
+
           {!isLive && (
             <button
               onClick={onResetLayout}
               className="px-2 py-1 text-[11px] bg-tactical-panel dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-tactical-border text-tactical-textLight flex items-center gap-1 font-semibold"
             >
               <RotateCcw className="w-3 h-3" />
-              RESET SQUAD
+              RESET
             </button>
           )}
         </div>
-      </div>
-
-      {/* Top Center Zoom Controls */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-white/95 dark:bg-slate-900/95 border border-tactical-border p-1 shadow-sm pointer-events-auto">
-        <button
-          onClick={() => setZoom((prev) => Math.max(10, prev - 2))}
-          className="px-2 py-0.5 text-xs text-tactical-textMuted hover:text-tactical-textBright hover:bg-tactical-panel dark:hover:bg-slate-800 font-bold"
-        >
-          -
-        </button>
-        <span className="text-[10px] text-tactical-textLight px-1.5 font-bold">{zoom}x</span>
-        <button
-          onClick={() => setZoom((prev) => Math.min(36, prev + 2))}
-          className="px-2 py-0.5 text-xs text-tactical-textMuted hover:text-tactical-textBright hover:bg-tactical-panel dark:hover:bg-slate-800 font-bold"
-        >
-          +
-        </button>
       </div>
 
       {/* Upper Right: EW Jammer Panel (Collapsed by default in Demo Mode) */}
@@ -797,53 +800,106 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
           );
         })}
 
-      {/* TOP CENTER: 15-SECOND NSG TACTICAL CQB MISSION HUD */}
+      {/* TOP FLOATING CONSOLE: UNIFIED 15-SECOND NSG TACTICAL CQB MISSION CONTROLLER */}
       {!isLive && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-1">
-          <div className="bg-slate-950/90 border border-tactical-border px-4 py-1.5 rounded-sm flex items-center gap-3 shadow-xl backdrop-blur-md">
-            <span className="text-[10px] font-black bg-red-950 text-red-400 border border-red-800 px-2 py-0.5">
-              NSG 51 SAG // CQB
-            </span>
-            <span className="text-xs font-bold text-white tracking-wide">
-              {simPhaseName || '15s TACTICAL CQB GHOST RELAY SIMULATION'}
-            </span>
-            <span className="text-xs font-mono font-extrabold text-tactical-cyan bg-sky-950/80 border border-sky-800 px-2 py-0.5">
-              {simTime.toFixed(1)}s / 15.0s
-            </span>
-          </div>
-        </div>
-      )}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 bg-slate-950/95 border border-slate-800 p-2.5 rounded-sm shadow-2xl backdrop-blur-md max-w-2xl w-[95%] sm:w-[660px]">
+          {/* Top Status Row */}
+          <div className="w-full flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black bg-red-950 text-red-400 border border-red-800 px-2 py-0.5">
+                NSG 51 SAG // CQB
+              </span>
+              <span className={`text-xs font-bold tracking-wide ${
+                simTime < 4.5
+                  ? 'text-sky-400'
+                  : simTime < 8.5
+                  ? 'text-red-400'
+                  : simTime < 11.5
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
+              }`}>
+                {simPhaseName || '15s TACTICAL CQB GHOST RELAY SIMULATION'}
+              </span>
+            </div>
 
-      {/* BOTTOM CENTER: 15-SECOND CINEMATIC MISSION TIMELINE CONTROLLER */}
-      {!isLive && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 bg-slate-950/95 border border-slate-800 p-2.5 rounded-sm shadow-2xl backdrop-blur-md max-w-2xl w-[95%] sm:w-[650px]">
-          {/* Progress Timeline Bar with Phase Markers */}
-          <div className="w-full flex flex-col gap-1">
-            <div className="flex justify-between text-[9px] font-mono text-slate-400 uppercase">
-              <span
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-extrabold text-tactical-cyan bg-sky-950/80 border border-sky-800 px-2 py-0.5">
+                {simTime.toFixed(1)}s / 15.0s
+              </span>
+              <button
+                onClick={onTogglePlaySim}
+                className={`px-3 py-1 flex items-center gap-1.5 text-xs font-black tracking-wider uppercase rounded-sm border shadow-sm transition-all ${
+                  isPlayingSim
+                    ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400'
+                    : 'bg-tactical-cyan hover:bg-sky-600 text-white border-sky-400'
+                }`}
+              >
+                {isPlayingSim ? (
+                  <>
+                    <Pause className="w-3 h-3 fill-current" />
+                    <span>PAUSE</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>RUN SIM</span>
+                  </>
+                )}
+              </button>
+              <button
                 onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
-                className={`cursor-pointer hover:text-white ${simTime < 4.5 ? 'text-sky-400 font-bold' : ''}`}
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold uppercase rounded-sm border border-slate-700 flex items-center gap-1"
+                title="Restart Simulation (0s)"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>RESTART</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Phase Stepper Pills & Interactive Scrubber Track */}
+          <div className="w-full flex flex-col gap-1.5">
+            <div className="grid grid-cols-4 gap-1 text-[9px] font-mono uppercase">
+              <button
+                onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
+                className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
+                  simTime < 4.5
+                    ? 'bg-sky-950 text-sky-300 border-sky-600 shadow-sm ring-1 ring-sky-500/50'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
+                }`}
               >
                 01: INGRESS (0s)
-              </span>
-              <span
+              </button>
+              <button
                 onClick={() => onSeekSimTime && onSeekSimTime(4.5)}
-                className={`cursor-pointer hover:text-white ${simTime >= 4.5 && simTime < 8.5 ? 'text-red-400 font-bold' : ''}`}
+                className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
+                  simTime >= 4.5 && simTime < 8.5
+                    ? 'bg-red-950 text-red-300 border-red-600 shadow-sm ring-1 ring-red-500/50'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
+                }`}
               >
                 02: SEVERED (4.5s)
-              </span>
-              <span
+              </button>
+              <button
                 onClick={() => onSeekSimTime && onSeekSimTime(8.5)}
-                className={`cursor-pointer hover:text-white ${simTime >= 8.5 && simTime < 11.5 ? 'text-amber-400 font-bold' : ''}`}
+                className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
+                  simTime >= 8.5 && simTime < 11.5
+                    ? 'bg-amber-950 text-amber-300 border-amber-600 shadow-sm ring-1 ring-amber-500/50'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
+                }`}
               >
                 03: GHOST DROP (8.5s)
-              </span>
-              <span
+              </button>
+              <button
                 onClick={() => onSeekSimTime && onSeekSimTime(11.5)}
-                className={`cursor-pointer hover:text-white ${simTime >= 11.5 ? 'text-emerald-400 font-bold' : ''}`}
+                className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
+                  simTime >= 11.5
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/50'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
+                }`}
               >
                 04: HEALED (11.5s)
-              </span>
+              </button>
             </div>
 
             {/* Interactive Scrubber Track */}
@@ -855,60 +911,29 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 const pct = Math.max(0, Math.min(1, clickX / rect.width));
                 onSeekSimTime(parseFloat((pct * 15.0).toFixed(1)));
               }}
-              className="relative w-full h-2.5 bg-slate-800 rounded-full cursor-pointer overflow-hidden border border-slate-700"
+              className="relative w-full h-2 bg-slate-800/80 rounded-full cursor-pointer overflow-hidden border border-slate-700/80"
+              title="Click or drag to scrub 15-second mission"
             >
               <div
                 style={{ width: `${(simTime / 15.0) * 100}%` }}
-                className="h-full bg-gradient-to-r from-sky-500 via-amber-500 to-emerald-500 transition-all duration-75"
+                className="h-full bg-gradient-to-r from-sky-500 via-red-500 via-amber-500 to-emerald-500 transition-all duration-75"
               />
             </div>
-          </div>
-
-          {/* Action Buttons Row */}
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={onTogglePlaySim}
-              className={`px-5 py-1.5 flex items-center gap-2 text-xs font-black tracking-wider uppercase rounded-sm border shadow-md transition-all ${
-                isPlayingSim
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400'
-                  : 'bg-tactical-cyan hover:bg-sky-600 text-white border-sky-400'
-              }`}
-            >
-              {isPlayingSim ? (
-                <>
-                  <Pause className="w-3.5 h-3.5 fill-current" />
-                  <span>PAUSE (15s LOOP)</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>RUN NSG SIMULATION</span>
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold uppercase rounded-sm border border-slate-700 flex items-center gap-1"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>RESTART</span>
-            </button>
           </div>
         </div>
       )}
 
-      {/* Bottom Floating Tactical Banner */}
-      <div className="absolute bottom-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
-        <div className="bg-slate-900/95 border border-tactical-border px-3 py-1.5 text-[11px] text-slate-300 flex items-center gap-2 pointer-events-auto shadow-sm">
-          <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-sky-500'}`} />
-          <span className="font-medium">
-            {isLive
-              ? 'LIVE HW MODE: Ingesting real received ESP32 packets only.'
-              : 'NSG 51 SAG CQB: Top-down dark building floorplan • Operatives moving behind concrete barrier.'}
-          </span>
+      {/* Bottom Floating Tactical Banner (Live Mode Only) */}
+      {isLive && (
+        <div className="absolute bottom-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
+          <div className="bg-slate-900/95 border border-tactical-border px-3 py-1.5 text-[11px] text-slate-300 flex items-center gap-2 pointer-events-auto shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-medium">
+              LIVE HW MODE: Ingesting real received ESP32 packets only.
+            </span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
