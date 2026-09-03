@@ -26,6 +26,67 @@ interface TacticalCanvasProps {
   onSeekSimTime?: (time: number) => void;
 }
 
+export function getLinkRssiStyle(rssiDbm: number = -70, isBlocked: boolean = false, isOffline: boolean = false) {
+  if (isOffline || isBlocked || rssiDbm <= -88) {
+    return {
+      strokeColor: '#ef4444', // Red
+      strokeDash: '5 4',
+      strokeWidth: 2,
+      badgeText: isBlocked ? `BLOCKED (${rssiDbm.toFixed(0)} dBm)` : `${rssiDbm.toFixed(0)} dBm`,
+      badgeBg: '#450a0a',
+      badgeBorder: '#ef4444',
+      badgeTextFill: '#fca5a5',
+      glowColor: 'rgba(239, 68, 68, 0.4)',
+    };
+  }
+  if (rssiDbm >= -60) {
+    return {
+      strokeColor: '#10b981', // Emerald Green (Strong)
+      strokeDash: 'none',
+      strokeWidth: 3,
+      badgeText: `${rssiDbm.toFixed(0)} dBm (STRONG)`,
+      badgeBg: '#064e3b',
+      badgeBorder: '#10b981',
+      badgeTextFill: '#6ee7b7',
+      glowColor: 'rgba(16, 185, 129, 0.4)',
+    };
+  }
+  if (rssiDbm >= -72) {
+    return {
+      strokeColor: '#06b6d4', // Cyan (Good)
+      strokeDash: 'none',
+      strokeWidth: 2.5,
+      badgeText: `${rssiDbm.toFixed(0)} dBm (GOOD)`,
+      badgeBg: '#083344',
+      badgeBorder: '#06b6d4',
+      badgeTextFill: '#67e8f9',
+      glowColor: 'rgba(6, 182, 212, 0.4)',
+    };
+  }
+  if (rssiDbm >= -82) {
+    return {
+      strokeColor: '#f59e0b', // Amber (Fair)
+      strokeDash: '6 3',
+      strokeWidth: 2,
+      badgeText: `${rssiDbm.toFixed(0)} dBm (FAIR)`,
+      badgeBg: '#451a03',
+      badgeBorder: '#f59e0b',
+      badgeTextFill: '#fcd34d',
+      glowColor: 'rgba(245, 158, 11, 0.4)',
+    };
+  }
+  return {
+    strokeColor: '#f97316', // Orange (Poor)
+    strokeDash: '5 3',
+    strokeWidth: 2,
+    badgeText: `${rssiDbm.toFixed(0)} dBm (POOR)`,
+    badgeBg: '#431407',
+    badgeBorder: '#f97316',
+    badgeTextFill: '#fdba74',
+    glowColor: 'rgba(249, 115, 22, 0.4)',
+  };
+}
+
 export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
   nodes,
   links,
@@ -363,36 +424,28 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                   </text>
                 </g>
 
-                {/* Render Obstacle Concrete Barriers with High-Tech Hazard Crosshatch */}
+                {/* Render Obstacle Concrete Barriers */}
                 {displayWalls.map((wall) => {
                   const p1 = getScreenCoords(wall.x1, wall.y1, width, height);
                   const p2 = getScreenCoords(wall.x2, wall.y2, width, height);
+                  const midX = (p1.cx + p2.cx) / 2;
+                  const midY = (p1.cy + p2.cy) / 2;
                   return (
                     <g
                       key={wall.id}
                       className="pointer-events-auto cursor-pointer"
                       onClick={() => onToggleWall(wall.id)}
                     >
-                      {/* Outer Hazard Halo */}
+                      {/* Clean Concrete Barrier Core */}
                       <line
                         x1={p1.cx}
                         y1={p1.cy}
                         x2={p2.cx}
                         y2={p2.cy}
-                        stroke="#450a0a"
-                        strokeWidth="18"
-                        strokeLinecap="square"
-                        opacity="0.6"
-                      />
-                      {/* Concrete Wall Core */}
-                      <line
-                        x1={p1.cx}
-                        y1={p1.cy}
-                        x2={p2.cx}
-                        y2={p2.cy}
-                        stroke="#991b1b"
-                        strokeWidth="8"
-                        strokeLinecap="square"
+                        stroke="#7f1d1d"
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        opacity="0.9"
                       />
                       {/* Warning Stripe Center */}
                       <line
@@ -401,123 +454,38 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                         x2={p2.cx}
                         y2={p2.cy}
                         stroke="#f59e0b"
-                        strokeWidth="2.5"
-                        strokeDasharray="5 5"
+                        strokeWidth="2"
+                        strokeDasharray="4 4"
                       />
-                      <text
-                        x={(p1.cx + p2.cx) / 2}
-                        y={(p1.cy + p2.cy) / 2 - 12}
-                        fill="#ef4444"
-                        fontSize="9.5"
-                        textAnchor="middle"
-                        fontFamily="monospace"
-                        fontWeight="extrabold"
-                        className="tracking-wider drop-shadow"
-                      >
-                        REINFORCED CONCRETE 0.35m (-{wall.attenuationDb}dB)
-                      </text>
+                      {/* Compact Wall Badge */}
+                      <g transform={`translate(${midX}, ${midY - 14})`}>
+                        <rect
+                          x="-68"
+                          y="-9"
+                          width="136"
+                          height="18"
+                          fill="#0f172a"
+                          stroke="#ef4444"
+                          strokeWidth="1"
+                          rx="3"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          fill="#fca5a5"
+                          fontSize="9"
+                          textAnchor="middle"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          CONCRETE WALL (-{wall.attenuationDb}dB)
+                        </text>
+                      </g>
                     </g>
                   );
                 })}
 
-                {/* PHASE 2 SPECIAL: Fragmented Glowing Red Connection Line behind Concrete Wall */}
-                {mode === 'simulation' && simTime >= 4.5 && simTime < 8.5 && (
-                  <g>
-                    {(() => {
-                      const pTOC = getScreenCoords(0, 0, width, height);
-                      const alpha = nodes.find((n) => n.id === 'CMD-01');
-                      const pAlpha = getScreenCoords(alpha?.x ?? 14, alpha?.y ?? 7.8, width, height);
-                      return (
-                        <g>
-                          {/* Fragmented Flickering Red Line */}
-                          <line
-                            x1={pTOC.cx}
-                            y1={pTOC.cy}
-                            x2={pAlpha.cx}
-                            y2={pAlpha.cy}
-                            stroke="#ef4444"
-                            strokeWidth="3"
-                            strokeDasharray="8 6"
-                          >
-                            <animate
-                              attributeName="opacity"
-                              values="0.9;0.15;0.85;0.2;0.9"
-                              dur="0.5s"
-                              repeatCount="indefinite"
-                            />
-                          </line>
-                          <circle
-                            cx={(pTOC.cx + pAlpha.cx) / 2}
-                            cy={(pTOC.cy + pAlpha.cy) / 2}
-                            r="6"
-                            fill="#ef4444"
-                            className="animate-ping"
-                          />
-                        </g>
-                      );
-                    })()}
-                  </g>
-                )}
-
-                {/* PHASE 4 SPECIAL: Snapped Brilliant 2-Hop Bounced Mesh Line around Wall Corner */}
-                {mode === 'simulation' && simTime >= 11.5 && (
-                  <g>
-                    {(() => {
-                      const pTOC = getScreenCoords(0, 0, width, height);
-                      const pCorner = getScreenCoords(8.0, 4.5, width, height);
-                      const alpha = nodes.find((n) => n.id === 'CMD-01');
-                      const pAlpha = getScreenCoords(alpha?.x ?? 14, alpha?.y ?? 7.8, width, height);
-
-                      return (
-                        <g>
-                          {/* Hop 1: TOC -> Corner Ghost */}
-                          <line
-                            x1={pTOC.cx}
-                            y1={pTOC.cy}
-                            x2={pCorner.cx}
-                            y2={pCorner.cy}
-                            stroke="#38bdf8"
-                            strokeWidth="4"
-                            strokeOpacity="0.9"
-                          />
-                          <line
-                            x1={pTOC.cx}
-                            y1={pTOC.cy}
-                            x2={pCorner.cx}
-                            y2={pCorner.cy}
-                            stroke="#ffffff"
-                            strokeWidth="1.5"
-                          />
-
-                          {/* Hop 2: Corner Ghost -> ALPHA-POINT (Bounced Around Wall) */}
-                          <line
-                            x1={pCorner.cx}
-                            y1={pCorner.cy}
-                            x2={pAlpha.cx}
-                            y2={pAlpha.cy}
-                            stroke="#38bdf8"
-                            strokeWidth="4"
-                            strokeOpacity="0.9"
-                          />
-                          <line
-                            x1={pCorner.cx}
-                            y1={pCorner.cy}
-                            x2={pAlpha.cx}
-                            y2={pAlpha.cy}
-                            stroke="#ffffff"
-                            strokeWidth="1.5"
-                          />
-
-                          {/* Corner Reflection Spark */}
-                          <circle cx={pCorner.cx} cy={pCorner.cy} r="8" fill="#38bdf8" fillOpacity="0.4" className="animate-ping" />
-                          <circle cx={pCorner.cx} cy={pCorner.cy} r="4" fill="#ffffff" />
-                        </g>
-                      );
-                    })()}
-                  </g>
-                )}
-
-                {/* Render Active Ad-Hoc Multi-Hop Mesh Links */}
+                {/* Render Active Ad-Hoc Multi-Hop Mesh Links Styled Directly by RSSI */}
                 {links.map((link) => {
                   const fromNode = nodes.find((n) => n.id === link.fromId);
                   const toNode = nodes.find((n) => n.id === link.toId);
@@ -531,115 +499,114 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                   const p1 = getScreenCoords(fromX, fromY, width, height);
                   const p2 = getScreenCoords(toX, toY, width, height);
 
-                  const isOfflineLink = fromNode.isOffline || toNode.isOffline;
-                  let strokeColor = isOfflineLink ? '#dc2626' : '#0284c7';
-                  let strokeDash = isOfflineLink ? '4 4' : 'none';
-                  let strokeWidth = isOfflineLink ? 1.5 : 2.5;
-
-                  if (!isOfflineLink) {
-                    if (link.status === 'degraded') {
-                      strokeColor = '#d97706';
-                      strokeDash = '6 3';
-                      strokeWidth = 2;
-                    } else if (link.status === 'critical' || link.status === 'broken') {
-                      strokeColor = '#dc2626';
-                      strokeDash = '4 3';
-                      strokeWidth = 1.5;
-                    }
-                  }
+                  const isOfflineLink = !!(fromNode.isOffline || toNode.isOffline || link.status === 'broken');
+                  const isBlocked = !!(link.isBlockedByWall || isOfflineLink);
+                  const style = getLinkRssiStyle(link.rssiDbm, isBlocked, isOfflineLink);
 
                   const midX = (p1.cx + p2.cx) / 2;
                   const midY = (p1.cy + p2.cy) / 2;
 
                   return (
                     <g key={`${link.fromId}-${link.toId}`}>
+                      {/* Outer soft glow halo */}
                       <line
                         x1={p1.cx}
                         y1={p1.cy}
                         x2={p2.cx}
                         y2={p2.cy}
-                        stroke={strokeColor}
-                        strokeWidth={strokeWidth}
-                        strokeDasharray={strokeDash}
-                        strokeOpacity={isOfflineLink || link.status === 'broken' ? 0.35 : 0.9}
+                        stroke={style.strokeColor}
+                        strokeWidth={style.strokeWidth + 4}
+                        strokeOpacity="0.18"
                       />
-                      {!isOfflineLink && (
-                        <circle cx={(p1.cx * 0.4 + p2.cx * 0.6)} cy={(p1.cy * 0.4 + p2.cy * 0.6)} r="3" fill={strokeColor} />
+                      {/* Main RSSI-Colored Link Line */}
+                      <line
+                        x1={p1.cx}
+                        y1={p1.cy}
+                        x2={p2.cx}
+                        y2={p2.cy}
+                        stroke={style.strokeColor}
+                        strokeWidth={style.strokeWidth}
+                        strokeDasharray={style.strokeDash}
+                        strokeOpacity={isBlocked ? 0.75 : 0.95}
+                      />
+                      {/* Dynamic flow pulse particle along connected line */}
+                      {!isBlocked && (
+                        <circle
+                          cx={p1.cx * 0.45 + p2.cx * 0.55}
+                          cy={p1.cy * 0.45 + p2.cy * 0.55}
+                          r="3.5"
+                          fill={style.strokeColor}
+                          className="animate-pulse"
+                        />
                       )}
-                      
-                      <rect
-                        x={midX - 34}
-                        y={midY - 9}
-                        width="68"
-                        height="18"
-                        fill="#0f172a"
-                        stroke={strokeColor}
-                        strokeWidth="1"
-                        rx="2"
-                      />
-                      <text
-                        x={midX}
-                        y={midY + 3}
-                        fill={isOfflineLink ? '#ef4444' : '#38bdf8'}
-                        fontSize="8.5"
-                        textAnchor="middle"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        {isOfflineLink ? 'SEVERED' : `${link.sinrDb}dB (${link.distanceMeters}m)`}
-                      </text>
-                    </g>
-                  );
-                })}
 
-                {/* Render Ghost Nodes (Pulsing Green Holographic Relay at Corner in Phase 3/4) */}
-                {ghostNodes.map((ghost) => {
-                  const opt = getScreenCoords(ghost.optimalX, ghost.optimalY, width, height);
-
-                  return (
-                    <g key={`ghost-${ghost.targetNodeId}`} transform={`translate(${opt.cx}, ${opt.cy})`}>
-                      {/* Concentric Green Sonar Expanding Waves */}
-                      <circle r="36" fill="none" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
-                      <circle r="24" fill="none" stroke="#10b981" strokeWidth="1.5" opacity="0.6" className="animate-ping" />
-                      <circle r="12" fill="#10b981" fillOpacity="0.25" stroke="#10b981" strokeWidth="2" />
-                      <circle r="4" fill="#10b981" />
-
-                      {/* Ghost Waypoint Hologram Badge */}
-                      <g transform="translate(18, -14)">
+                      {/* Prominent RSSI Value Badge on the Link Line */}
+                      <g transform={`translate(${midX}, ${midY})`}>
                         <rect
-                          x="0"
-                          y="0"
-                          width="185"
-                          height="34"
-                          fill="#064e3b"
-                          stroke="#10b981"
-                          strokeWidth="1.5"
-                          rx="2"
+                          x="-46"
+                          y="-10"
+                          width="92"
+                          height="20"
+                          fill={style.badgeBg}
+                          stroke={style.badgeBorder}
+                          strokeWidth="1.2"
+                          rx="3"
                         />
                         <text
-                          x="8"
-                          y="13"
-                          fill="#a7f3d0"
-                          fontSize="9.5"
+                          x="0"
+                          y="4"
+                          fill={style.badgeTextFill}
+                          fontSize="9"
+                          textAnchor="middle"
                           fontFamily="monospace"
                           fontWeight="bold"
                         >
-                          ✦ GHOST RELAY: {ghost.targetCallsign}
-                        </text>
-                        <text
-                          x="8"
-                          y="26"
-                          fill="#34d399"
-                          fontSize="8.5"
-                          fontFamily="monospace"
-                          fontWeight="bold"
-                        >
-                          WALL CORNER (8.0, 4.5) // +22.4dB HEAL
+                          {style.badgeText}
                         </text>
                       </g>
                     </g>
                   );
                 })}
+
+                {/* Render Ghost Nodes (Pulsing Green Relay Node at Corner) */}
+                {ghostNodes.map((ghost) => {
+                  const opt = getScreenCoords(ghost.optimalX, ghost.optimalY, width, height);
+
+                  return (
+                    <g key={`ghost-${ghost.targetNodeId}`} transform={`translate(${opt.cx}, ${opt.cy})`}>
+                      <circle r="26" fill="none" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
+                      <circle r="18" fill="none" stroke="#10b981" strokeWidth="1.5" opacity="0.7" className="animate-ping" />
+                      <circle r="10" fill="#10b981" fillOpacity="0.3" stroke="#10b981" strokeWidth="2" />
+                      <circle r="3.5" fill="#ffffff" />
+
+                      {/* Compact Relay Badge */}
+                      <g transform="translate(0, -18)">
+                        <rect
+                          x="-48"
+                          y="-8"
+                          width="96"
+                          height="16"
+                          fill="#064e3b"
+                          stroke="#10b981"
+                          strokeWidth="1.2"
+                          rx="2"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          fill="#a7f3d0"
+                          fontSize="8.5"
+                          textAnchor="middle"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          ✦ RELAY DEPLOYED
+                        </text>
+                      </g>
+                    </g>
+                  );
+                })}
+
 
                 {/* Conformal Beam Sector Cones & 360-Degree Sweep on Disconnected Nodes */}
                 {showSectors &&
@@ -803,25 +770,33 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
           );
         })}
 
-      {/* TOP FLOATING CONSOLE: UNIFIED 15-SECOND NSG TACTICAL CQB MISSION CONTROLLER */}
+      {/* TOP FLOATING CONSOLE: SIMPLE & CLEAN SIMULATION / SANDBOX CONTROLLER */}
       {!isLive && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 bg-slate-950/95 border border-slate-800 p-2.5 rounded-sm shadow-2xl backdrop-blur-md max-w-2xl w-[95%] sm:w-[660px]">
-          {/* Top Status Row */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2 bg-slate-950/95 border border-slate-800 p-2.5 rounded-sm shadow-2xl backdrop-blur-md max-w-2xl w-[95%] sm:w-[680px]">
+          {/* Top Status & Main Controls Row */}
           <div className="w-full flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black bg-red-950 text-red-400 border border-red-800 px-2 py-0.5">
-                NSG 51 SAG // CQB
+              <span className={`text-[10px] font-black px-2 py-0.5 border uppercase ${
+                isPlayingSim
+                  ? 'bg-amber-950/90 text-amber-300 border-amber-700 animate-pulse'
+                  : 'bg-sky-950/90 text-sky-300 border-sky-700'
+              }`}>
+                {isPlayingSim ? '● SIMULATION' : '🖐 MANUAL DRAG'}
               </span>
               <span className={`text-xs font-bold tracking-wide ${
-                simTime < 4.5
-                  ? 'text-sky-400'
+                !isPlayingSim
+                  ? 'text-sky-300'
+                  : simTime < 4.5
+                  ? 'text-emerald-400'
                   : simTime < 8.5
                   ? 'text-red-400'
                   : simTime < 11.5
                   ? 'text-amber-400'
                   : 'text-emerald-400'
               }`}>
-                {simPhaseName || '15s TACTICAL CQB GHOST RELAY SIMULATION'}
+                {isPlayingSim
+                  ? (simPhaseName || 'CQB Mesh Simulation')
+                  : 'Drag any soldier node around walls to test live RSSI loss'}
               </span>
             </div>
 
@@ -840,7 +815,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 {isPlayingSim ? (
                   <>
                     <Pause className="w-3 h-3 fill-current" />
-                    <span>PAUSE</span>
+                    <span>PAUSE & DRAG</span>
                   </>
                 ) : (
                   <>
@@ -850,12 +825,15 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 )}
               </button>
               <button
-                onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
+                onClick={() => {
+                  onResetLayout();
+                  if (onSeekSimTime) onSeekSimTime(0.0);
+                }}
                 className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold uppercase rounded-sm border border-slate-700 flex items-center gap-1"
-                title="Restart Simulation (0s)"
+                title="Reset Squad & Simulation"
               >
                 <RotateCcw className="w-3 h-3" />
-                <span>RESTART</span>
+                <span>RESET</span>
               </button>
             </div>
           </div>
@@ -867,7 +845,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
                   simTime < 4.5
-                    ? 'bg-sky-950 text-sky-300 border-sky-600 shadow-sm ring-1 ring-sky-500/50'
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
@@ -881,7 +859,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                02: SEVERED (4.5s)
+                02: BLOCKED (4.5s)
               </button>
               <button
                 onClick={() => onSeekSimTime && onSeekSimTime(8.5)}
@@ -891,7 +869,7 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                03: GHOST DROP (8.5s)
+                03: DROP RELAY (8.5s)
               </button>
               <button
                 onClick={() => onSeekSimTime && onSeekSimTime(11.5)}
@@ -919,10 +897,43 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
             >
               <div
                 style={{ width: `${(simTime / 15.0) * 100}%` }}
-                className="h-full bg-gradient-to-r from-sky-500 via-red-500 via-amber-500 to-emerald-500 transition-all duration-75"
+                className="h-full bg-gradient-to-r from-emerald-500 via-red-500 via-amber-500 to-emerald-500 transition-all duration-75"
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* RSSI Signal Quality Color Legend (Bottom Left) */}
+      {!isLive && (
+        <div className="absolute bottom-3 left-3 z-20 pointer-events-auto bg-slate-900/95 border border-tactical-border px-3 py-1.5 text-[10px] text-slate-300 flex flex-wrap items-center gap-3 shadow-md font-mono">
+          <span className="font-bold text-white uppercase">LINK RSSI:</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
+            <span className="text-emerald-400 font-semibold">≥ -60 dBm (Strong)</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-sm" />
+            <span className="text-cyan-400 font-semibold">-60 to -72 dBm (Good)</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm" />
+            <span className="text-amber-400 font-semibold">-72 to -82 dBm (Fair)</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm" />
+            <span className="text-red-400 font-semibold">&lt; -82 dBm (Blocked)</span>
+          </span>
+        </div>
+      )}
+
+      {/* Manual Mode Drag & Drop Hint */}
+      {!isPlayingSim && !isLive && (
+        <div className="absolute bottom-12 left-3 z-20 pointer-events-auto bg-sky-950/90 border border-sky-600/80 px-3 py-1.5 text-[11px] text-sky-200 flex items-center gap-2 shadow-lg font-mono">
+          <span>💡</span>
+          <span>
+            <strong>Interactive Mode:</strong> Drag <strong>ALPHA-POINT</strong> behind the concrete wall to see signal sever to RED; move near <strong>RELAY</strong> to see 2-hop mesh turn GREEN.
+          </span>
         </div>
       )}
 
