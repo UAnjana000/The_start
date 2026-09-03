@@ -178,7 +178,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </div>
       </div>
 
-      {/* UML Architecture of Project Section (Palantir Foundry Data Pipeline) */}
+      {/* UML Architecture of Project Section (CQB Tactical Mesh Data Pipeline) */}
       <div className="bg-white dark:bg-slate-900 border border-tactical-border p-6 shadow-sm flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         {/* Embedded Interactive UML Data Flow */}
         <DataFlowDiagram />
 
-        {/* Foundry Component Specification Matrix */}
+        {/* Component Specification Matrix */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 text-xs">
           <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3">
             <div className="text-tactical-cyan font-bold uppercase mb-1">1. XIAO ESP32-C6 EDGE HARDWARE</div>
@@ -214,7 +214,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             </div>
           </div>
           <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3">
-            <div className="text-tactical-green font-bold uppercase mb-1">3. PALANTIR C2 TACTICAL CONSOLE</div>
+            <div className="text-tactical-green font-bold uppercase mb-1">3. TACTICAL C2 MISSION CONSOLE</div>
             <div className="text-slate-600 dark:text-slate-400 text-[11px] font-sans">
               Full-screen tactical canvas displays live multi-hop B.A.T.M.A.N. routing, translucent blue circles for active nodes, and pulsing red markers at last-known positions for disconnected nodes.
             </div>

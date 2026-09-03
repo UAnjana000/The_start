@@ -828,32 +828,9 @@ export default function TacticalDashboardPage() {
                   <span className="hidden xl:inline text-[9.5px] text-slate-400 font-mono">
                     apparatus-certified-default-rtdb.asia-southeast1.firebasedatabase.app/nodes.json
                   </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => ingestLivePacket('CMD-01', 'ALPHA-POINT', 'pointman', 5.2, 3.1, 95, 3, false)}
-                    className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-[9.5px] font-bold"
-                  >
-                    + TEST CMD-01 (ONLINE)
-                  </button>
-                  <button
-                    onClick={() => ingestLivePacket('CMD-03', 'CHARLIE-RELAY', 'breacher', 12.8, 6.9, 88, 4, false)}
-                    className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-[9.5px] font-bold"
-                  >
-                    + TEST CMD-03 (ONLINE)
-                  </button>
-                  <button
-                    onClick={() => ingestLivePacket('CMD-05', 'ECHO-SCOUT', 'scout_relay', 20.4, 8.7, 82, 4, true)}
-                    className="px-2 py-1 bg-red-50 dark:bg-red-950/60 hover:bg-red-100 dark:hover:bg-red-900 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-[9.5px] font-bold"
-                  >
-                    + TEST CMD-05 (OFFLINE RED)
-                  </button>
-                  <button
-                    onClick={() => handleToggleNodeConnection('CMD-05')}
-                    className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-white text-[9.5px] font-bold"
-                  >
-                    TOGGLE CMD-05
-                  </button>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                    ACTIVE SINK // LISTENING ON 2.4GHz
+                  </span>
                 </div>
               </div>
             </div>

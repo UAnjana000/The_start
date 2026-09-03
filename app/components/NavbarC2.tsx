@@ -87,24 +87,8 @@ export const NavbarC2: React.FC<NavbarC2Props> = ({
             </span>
           </div>
 
-          {/* Quick Metrics Capsule */}
+          {/* Quick Status Pill */}
           <div className="hidden lg:flex items-center gap-2 text-xs">
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-tactical-border dark:border-slate-800 px-2 py-0.5">
-              <Activity className="w-3 h-3 text-tactical-cyan" />
-              <span className="text-slate-500 dark:text-slate-400 text-[10.5px]">SINR:</span>
-              <span
-                className={`font-bold text-[11px] ${
-                  systemSinrAvg >= 14
-                    ? 'text-tactical-cyan'
-                    : systemSinrAvg >= 8
-                    ? 'text-tactical-amber'
-                    : 'text-tactical-crimson'
-                }`}
-              >
-                {systemSinrAvg.toFixed(1)} dB
-              </span>
-            </div>
-
             {activeTab === 'dashboard' ? (
               <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

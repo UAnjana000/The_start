@@ -84,7 +84,7 @@ export const HeaderC2: React.FC<HeaderC2Props> = ({
 
         <div className="hidden xl:flex items-center gap-1 text-tactical-textMuted text-[10px]">
           <Database className="w-3 h-3 text-tactical-textMuted" />
-          <span>BLACKBOX: <strong className="text-tactical-textLight">{totalPacketsLogged}</strong></span>
+          <span>DATABASE: <strong className="text-tactical-textLight">{totalPacketsLogged}</strong></span>
         </div>
       </div>
 

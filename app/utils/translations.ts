@@ -113,7 +113,7 @@ export const translations: Record<LanguageKey, TranslationDict> = {
     innovation3Desc: 'Dynamic ad-hoc routing tree automatically pivots data around thick walls through intermediate squadmates without central base station dependency.',
     innovation4Title: 'AI Spatial Ghost Healing Engine',
     innovation4Desc: 'Predictive SINR spatial optimizer computes millimeter-accurate physical repositioning vectors ("Ghost Nodes") to instantly repair broken or degraded comms links.',
-    umlArchitecture: 'PALANTIR FOUNDRY ARCHITECTURE & UML DATA PIPELINE',
+    umlArchitecture: 'TACTICAL C2 ARCHITECTURE & UML DATA PIPELINE',
     launchConsole: 'LAUNCH TACTICAL C2 DASHBOARD',
 
     nodesTitle: 'TACTICAL MESH NODE DIRECTORY & TELEMETRY',
@@ -253,7 +253,7 @@ export const translations: Record<LanguageKey, TranslationDict> = {
     innovation3Desc: 'Enrutamiento dinámico salto a salto sin necesidad de estación base.',
     innovation4Title: 'Motor de Curación Espacial IA',
     innovation4Desc: 'Calcula vectores de reposicionamiento milimétricos ("Ghost Nodes") para restaurar enlaces.',
-    umlArchitecture: 'ARQUITECTURA PALANTIR FOUNDRY Y PIPELINE UML',
+    umlArchitecture: 'ARQUITECTURA TÁCTICA C2 Y PIPELINE UML',
     launchConsole: 'INICIAR CONSOLA TÁCTICA',
 
     nodesTitle: 'DIRECTORIO DE NODOS TÁCTICOS Y TELEMETRÍA',
@@ -323,7 +323,7 @@ export const translations: Record<LanguageKey, TranslationDict> = {
     innovation3Desc: 'Routage multi-sauts dynamique sans station de base.',
     innovation4Title: 'Moteur de Guérison Spatiale IA',
     innovation4Desc: 'Calcule les points de repositionnement précis ("Ghost Nodes") pour rétablir la communication.',
-    umlArchitecture: 'ARCHITECTURE PALANTIR FOUNDRY & PIPELINE UML',
+    umlArchitecture: 'ARCHITECTURE TACTIQUE C2 & PIPELINE UML',
     launchConsole: 'LANCER LA CONSOLE DE COMMANDEMENT',
 
     nodesTitle: 'RÉPERTOIRE DES NŒUDS TACTIQUES & TÉLÉMÉTRIE',
@@ -393,7 +393,7 @@ export const translations: Record<LanguageKey, TranslationDict> = {
     innovation3Desc: 'Dynamisches Multi-Hop-Routing ohne zentrale Basisstation.',
     innovation4Title: 'KI-Räumliche Ghost-Heilung',
     innovation4Desc: 'Berechnet millimetergenaue Neupositionierungsvektoren ("Ghost Nodes") zur Signalwiederherstellung.',
-    umlArchitecture: 'PALANTIR FOUNDRY ARCHITEKTUR & UML-DATENPIPELINE',
+    umlArchitecture: 'TAKTIK C2 ARCHITEKTUR & UML-DATENPIPELINE',
     launchConsole: 'EINSATZZENTRALE STARTEN',
 
     nodesTitle: 'TAKTIK-KNOTEN-VERZEICHNIS & TELEMETRIE',

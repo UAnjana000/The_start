@@ -66,7 +66,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400 font-sans">
-            Choose between Palantir Foundry high-contrast daylight theme and tactical C2 low-light night operations theme.
+            Choose between Tactical C2 high-contrast daylight theme and tactical C2 low-light night operations theme.
           </p>
 
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -150,7 +150,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <div className="flex flex-col gap-2.5 text-xs font-mono">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
               <span className="text-slate-600 dark:text-slate-400 font-sans">Carrier & Channel:</span>
-              <span className="font-bold text-slate-900 dark:text-white">2412 MHz (2.4GHz ISM Ch 1 / 802.11 LR)</span>
+              <span className="font-bold text-slate-900 dark:text-white">2.4 GHz ISM (2412 MHz • Ch 1)</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+              <span className="text-slate-600 dark:text-slate-400 font-sans">Channel Bandwidth (HT20):</span>
+              <span className="font-bold text-slate-900 dark:text-white">20.0 MHz (72.2 Mbps PHY / 802.11b/g/n)</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+              <span className="text-slate-600 dark:text-slate-400 font-sans">Tx Power Output:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">+20.0 dBm (100 mW EIRP, 0.25dB step)</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+              <span className="text-slate-600 dark:text-slate-400 font-sans">Rx Sensitivity (ESP-NOW):</span>
+              <span className="font-bold text-slate-900 dark:text-white">-99 dBm (1Mbps) / -108 dBm (LR Mode)</span>
             </div>
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
               <span className="text-slate-600 dark:text-slate-400 font-sans">Internal RF Switch (Seeed):</span>

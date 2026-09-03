@@ -46,10 +46,10 @@ export const MissionReplay: React.FC<MissionReplayProps> = ({
         <HardDrive className="w-4 h-4 text-tactical-cyan" />
         <div>
           <div className="text-[11px] font-bold text-tactical-textBright">
-            MISSION TELEMETRY BLACKBOX (INDEXEDDB)
+            FIREBASE REALTIME DATABASE (CLOUD INGRESS)
           </div>
           <div className="text-[9px] text-tactical-textMuted font-medium">
-            Zero-latency offline mission logging | {currentPacketCount} telemetry frames stored
+            Continuous cloud sync &amp; local cache | {currentPacketCount} telemetry frames stored
           </div>
         </div>
       </div>

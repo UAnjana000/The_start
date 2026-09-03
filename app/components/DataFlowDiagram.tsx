@@ -120,7 +120,7 @@ const INITIAL_UML_BOXES: UmlBox[] = [
   {
     id: 'c2_console',
     stereotype: '«C2_Console»',
-    title: 'Palantir Tactical Dashboard',
+    title: 'Tactical C2 Mission Console',
     x: 1020,
     y: 20,
     width: 220,
@@ -138,8 +138,8 @@ const INITIAL_UML_BOXES: UmlBox[] = [
     methods: [
       '+ parseFirebaseNodes()',
       '+ gpsToLocalGrid(lat, lon)',
-      '+ computeGhostWaypoints()',
-      '+ renderAdHocTopology()',
+      '+ renderAdHocMesh()',
+      '+ dispatchGhostHealer()',
     ],
   },
 ];
@@ -238,22 +238,12 @@ export const DataFlowDiagram: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setAnimating(!animating)}
-            className="px-2.5 py-1 text-[10px] bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5"
-          >
-            {animating ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-            <span>{animating ? 'PAUSE FLOW' : 'RESUME FLOW'}</span>
-          </button>
-          <button
             onClick={handleResetPositions}
             className="px-2.5 py-1 text-[10px] bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5"
           >
             <RotateCcw className="w-3 h-3 text-slate-500" />
             <span>RESET POSITIONS</span>
           </button>
-          <span className="text-[10px] bg-sky-50 dark:bg-sky-950/80 border border-sky-300 dark:border-sky-800 text-sky-800 dark:text-sky-300 px-2 py-0.5 font-bold flex items-center gap-1">
-            <Move className="w-3 h-3 text-sky-600" /> DRAGGABLE STEREOTYPES
-          </span>
         </div>
       </div>
 

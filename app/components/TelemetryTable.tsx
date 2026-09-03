@@ -75,22 +75,25 @@ export const TelemetryTable: React.FC<TelemetryTableProps> = ({
                 const ghost = ghostNodes.find((g) => g.targetNodeId === node.id);
                 const isSelected = selectedNodeId === node.id;
 
-                const sinr = link ? link.sinrDb : 35.0;
-                const videoBitrate = link ? link.videoBitrateKbps : 4500;
-                const nextHop = node.nextHopId || 'TANK-00';
-                const hops = node.hopCount ?? 1;
+                const sinr = node.isAnchor ? 40.0 : link ? link.sinrDb : 35.0;
+                const videoBitrate = node.isAnchor ? 8000 : link ? link.videoBitrateKbps : 4500;
+                const nextHop = node.isAnchor ? 'TOC SINK' : node.nextHopId || 'TANK-00';
+                const hops = node.isAnchor ? 0 : node.hopCount ?? 1;
 
-                let statusColor = 'text-slate-700';
-                let statusText = 'HEALTHY';
-                if (ghost || (link && (link.status === 'critical' || link.status === 'broken'))) {
+                let statusColor = 'text-emerald-700 dark:text-emerald-400 font-bold';
+                let statusText = 'CONNECTED';
+                if (node.isAnchor) {
+                  statusColor = 'text-sky-700 dark:text-sky-400 font-bold';
+                  statusText = 'CONNECTED (TOC SINK)';
+                } else if (node.isOffline) {
+                  statusColor = 'text-tactical-crimson font-bold';
+                  statusText = 'OFFLINE (LOST)';
+                } else if (ghost || (link && (link.status === 'critical' || link.status === 'broken'))) {
                   statusColor = 'text-tactical-crimson font-bold';
                   statusText = 'HEALING GHOST';
                 } else if (link && link.status === 'degraded') {
                   statusColor = 'text-tactical-amber font-bold';
                   statusText = 'DEGRADED';
-                } else if (node.isAnchor) {
-                  statusColor = 'text-slate-900 font-bold';
-                  statusText = 'ANCHOR TOC';
                 }
 
                 return (
