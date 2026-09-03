@@ -852,46 +852,36 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
 
           {/* Phase Stepper Pills & Interactive Scrubber Track */}
           <div className="w-full flex flex-col gap-1.5">
-            <div className="grid grid-cols-4 gap-1 text-[9px] font-mono uppercase">
+            <div className="grid grid-cols-3 gap-1.5 text-[9px] font-mono uppercase">
               <button
                 onClick={() => onSeekSimTime && onSeekSimTime(0.0)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime < 4.0
+                  simTime < 5.0
                     ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                01: BASELINE (0s)
+                01: INGRESS (0s)
               </button>
               <button
-                onClick={() => onSeekSimTime && onSeekSimTime(4.0)}
+                onClick={() => onSeekSimTime && onSeekSimTime(5.0)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 4.0 && simTime < 8.0
-                    ? 'bg-cyan-950 text-cyan-300 border-cyan-600 shadow-sm ring-1 ring-cyan-500/50'
-                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
-                }`}
-              >
-                02: RSSI LOSS (4s)
-              </button>
-              <button
-                onClick={() => onSeekSimTime && onSeekSimTime(8.0)}
-                className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 8.0 && simTime < 11.0
+                  simTime >= 5.0 && simTime < 10.0
                     ? 'bg-red-950 text-red-300 border-red-600 shadow-sm ring-1 ring-red-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                03: BLOCKED (8s)
+                02: DUAL-WALL BLOCKED (5s)
               </button>
               <button
-                onClick={() => onSeekSimTime && onSeekSimTime(11.0)}
+                onClick={() => onSeekSimTime && onSeekSimTime(10.0)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 11.0
+                  simTime >= 10.0
                     ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                04: AD-HOC MESH (11s)
+                03: AD-HOC MESH (10s)
               </button>
             </div>
 
