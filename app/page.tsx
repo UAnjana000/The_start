@@ -8,7 +8,6 @@ import { AlertsTab } from './components/AlertsTab';
 import { DataGraphsTab } from './components/DataGraphsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { TacticalCanvas } from './components/TacticalCanvas';
-import { SimulationEditorModal } from './components/SimulationEditorModal';
 import { VideoPiP } from './components/VideoPiP';
 import {
   TacticalNode,
@@ -37,7 +36,7 @@ import { Radio, Database, Wifi } from 'lucide-react';
 const ANCHOR_NODE: TacticalNode = {
   id: 'TANK-00',
   callsign: 'TOC-ANCHOR',
-  displayName: 'TOC-ANCHOR',
+  displayName: 'TOC-ANCHOR [TOC]',
   role: 'anchor',
   x: 0.0,
   y: 0.0,
@@ -54,11 +53,53 @@ const ANCHOR_NODE: TacticalNode = {
 const SIMULATION_NODES: TacticalNode[] = [
   ANCHOR_NODE,
   {
+    id: 'CMD-06',
+    callsign: 'CMD-06',
+    displayName: 'CMD-06 (FLANK) [1H➔TANK-00]',
+    role: 'pointman',
+    x: -20.0,
+    y: 0.0,
+    battery: 92,
+    activeSector: 2,
+    txPowerDbm: 20.0,
+    noiseFloorDbm: -95.0,
+    hopCount: 1,
+    nextHopId: 'TANK-00',
+  },
+  {
+    id: 'CMD-02',
+    callsign: 'BRAVO-SUPPORT',
+    displayName: 'BRAVO-SUPPORT [2H➔C06]',
+    role: 'assault',
+    x: -12.0,
+    y: -4.5,
+    battery: 88,
+    activeSector: 4,
+    txPowerDbm: 20.0,
+    noiseFloorDbm: -95.0,
+    hopCount: 2,
+    nextHopId: 'CMD-06',
+  },
+  {
+    id: 'CMD-04',
+    callsign: 'DELTA-SCOUT',
+    displayName: 'DELTA-SCOUT [1H➔TANK-00]',
+    role: 'marksman',
+    x: 4.5,
+    y: 3.0,
+    battery: 90,
+    activeSector: 4,
+    txPowerDbm: 20.0,
+    noiseFloorDbm: -95.0,
+    hopCount: 1,
+    nextHopId: 'TANK-00',
+  },
+  {
     id: 'CMD-01',
     callsign: 'ALPHA-POINT',
-    displayName: 'ALPHA-POINT',
+    displayName: 'ALPHA-POINT [2H➔C03]',
     role: 'pointman',
-    x: 9.1,
+    x: 10.0,
     y: -5.0,
     battery: 94,
     activeSector: 1,
@@ -68,26 +109,12 @@ const SIMULATION_NODES: TacticalNode[] = [
     nextHopId: 'CMD-03',
   },
   {
-    id: 'CMD-02',
-    callsign: 'BRAVO-SUPPORT',
-    displayName: 'BRAVO-SUPPORT',
-    role: 'assault',
-    x: -20.0,
-    y: -4.4,
-    battery: 88,
-    activeSector: 4,
-    txPowerDbm: 20.0,
-    noiseFloorDbm: -95.0,
-    hopCount: 2,
-    nextHopId: 'CMD-06',
-  },
-  {
     id: 'CMD-03',
     callsign: 'CHARLIE-CORNER',
-    displayName: 'CHARLIE-CORNER',
+    displayName: 'CHARLIE-CORNER [2H➔C04]',
     role: 'breacher',
-    x: 17.2,
-    y: 0.5,
+    x: 17.5,
+    y: -2.5,
     battery: 86,
     activeSector: 4,
     txPowerDbm: 20.0,
@@ -96,25 +123,11 @@ const SIMULATION_NODES: TacticalNode[] = [
     nextHopId: 'CMD-04',
   },
   {
-    id: 'CMD-04',
-    callsign: 'DELTA-SCOUT',
-    displayName: 'DELTA-SCOUT',
-    role: 'marksman',
-    x: 4.7,
-    y: 2.5,
-    battery: 90,
-    activeSector: 4,
-    txPowerDbm: 20.0,
-    noiseFloorDbm: -95.0,
-    hopCount: 1,
-    nextHopId: 'TANK-00',
-  },
-  {
     id: 'CMD-05',
     callsign: 'CMD-05',
-    displayName: 'CMD-05 (UPPER)',
+    displayName: 'CMD-05 (UPPER) [3H➔C03]',
     role: 'pointman',
-    x: 18.8,
+    x: 18.5,
     y: 7.0,
     battery: 92,
     activeSector: 2,
@@ -122,20 +135,6 @@ const SIMULATION_NODES: TacticalNode[] = [
     noiseFloorDbm: -95.0,
     hopCount: 3,
     nextHopId: 'CMD-03',
-  },
-  {
-    id: 'CMD-06',
-    callsign: 'CMD-06',
-    displayName: 'CMD-06 (FLANK)',
-    role: 'pointman',
-    x: -12.1,
-    y: 1.2,
-    battery: 92,
-    activeSector: 2,
-    txPowerDbm: 20.0,
-    noiseFloorDbm: -95.0,
-    hopCount: 1,
-    nextHopId: 'TANK-00',
   },
 ];
 
@@ -196,112 +195,77 @@ export default function TacticalDashboardPage() {
     return () => clearInterval(interval);
   }, [isPlayingSim, activeTab]);
 
-  // Derive dynamic NSG tactical simulation state from 15-second timeline
-  // Derive dynamic tactical simulation state from 15-second timeline (User's 3-step scenario)
+  // Derive dynamic tactical simulation state from 15-second timeline (Matching 3 keyframe images)
   const { currentSimNodes, currentSimGhostNodes, currentSimPhase } = useMemo(() => {
     const t = simTime; // 0.0 to 15.0 seconds
     let phase = '';
-    let alphaX = 4.5;
-    let alphaY = 0.5;
-    let alphaOffline = false;
-    let cmd5X = 17.0;
-    let cmd5Y = 2.0;
-    let cmd5Offline = false;
+    let c06X = -20.0;
+    let c06Y = 0.0;
+    let c02X = -12.0;
+    let c02Y = -4.5;
     const ghosts: GhostNode[] = [];
-    let alphaHop = 2;
-    let alphaNextHop = 'CMD-04';
 
     if (t < 5.0) {
-      // STEP 1: INGRESS & DEPLOYMENT (0.0s - 5.0s)
-      const progress = t / 5.0;
-      alphaX = parseFloat((4.5 + progress * 2.5).toFixed(1)); // moves 4.5 -> 7.0
-      alphaY = 0.5;
-      cmd5X = parseFloat((17.0 + progress * 1.0).toFixed(1));
-      cmd5Y = 2.0;
-      alphaOffline = false;
-      cmd5Offline = false;
-      alphaHop = 1;
-      alphaNextHop = 'CMD-04';
-      phase = '01: INGRESS // SQUAD ADVANCES INTO CQB SECTORS (LoS NOMINAL)';
+      // KEYFRAME 01: DIRECT WALL OCCLUSION (0.0s - 5.0s) [1.jpeg]
+      c06X = -20.0;
+      c06Y = 0.0;
+      c02X = -12.0;
+      c02Y = -4.5;
+      phase = 'KEYFRAME 01: DIRECT WALL OCCLUSION // 2 BLOCKED LINKS (-56 dBm)';
     } else if (t < 10.0) {
-      // STEP 2: DUAL-WALL OCCLUSION // LINKS BLOCKED RED (5.0s - 10.0s)
+      // KEYFRAME 02: FLANK MESH FORMS (5.0s - 10.0s) [2.jpeg]
       const progress = (t - 5.0) / 5.0;
-      alphaX = parseFloat((7.0 + progress * 2.1).toFixed(1)); // moves 7.0 -> 9.1 (behind Wall-01)
-      alphaY = parseFloat((0.5 - progress * 5.5).toFixed(1)); // moves 0.5 -> -5.0
-      cmd5X = parseFloat((18.0 + progress * 0.8).toFixed(1)); // moves 18.0 -> 18.8 (above Wall-02)
-      cmd5Y = parseFloat((2.0 + progress * 5.0).toFixed(1)); // moves 2.0 -> 7.0
-      alphaOffline = true;
-      cmd5Offline = true;
-      alphaHop = 99;
-      alphaNextHop = 'OFFLINE';
-      phase = '02: WALL OCCLUSION // CONCRETE WALLS CUT DIRECT LINKS (🔴 BLOCKED -98 dBm)';
+      c06X = parseFloat((-20.0 - progress * 6.0).toFixed(1)); // moves -20.0 -> -26.0
+      c06Y = parseFloat((0.0 - progress * 1.0).toFixed(1));   // moves 0.0 -> -1.0
+      c02X = parseFloat((-12.0 - progress * 2.0).toFixed(1)); // moves -12.0 -> -14.0
+      c02Y = parseFloat((-4.5 + progress * 0.5).toFixed(1));  // moves -4.5 -> -4.0
+      phase = 'KEYFRAME 02: FLANK MESH FORMS // C06 RELAYS VIA BRAVO (-30 dBm)';
     } else {
-      // STEP 3: AD-HOC MESH REROUTES AROUND BOTH WALLS (10.0s - 15.0s)
-      alphaX = 9.1;
-      alphaY = -5.0;
-      cmd5X = 18.8;
-      cmd5Y = 7.0;
-      alphaOffline = false;
-      cmd5Offline = false;
-      alphaHop = 3;
-      alphaNextHop = 'CMD-03';
-      phase = '03: AD-HOC MESH // MULTI-HOP REROUTES AROUND BARRIERS (🟢 100% HEALED)';
+      // KEYFRAME 03: AD-HOC MESH FULLY RESTORED (10.0s - 15.0s) [3.jpeg]
+      c06X = -26.0;
+      c06Y = -1.0;
+      c02X = -14.0;
+      c02Y = -4.0;
+      phase = 'KEYFRAME 03: AD-HOC MESH FULLY RESTORED // OVER-WALL ROUTING (100% HEALED)';
     }
 
     const squadNodes: TacticalNode[] = [
       ANCHOR_NODE,
       {
-        id: 'CMD-01',
-        callsign: 'ALPHA-POINT',
-        displayName: 'ALPHA-POINT',
+        id: 'CMD-06',
+        callsign: 'CMD-06',
+        displayName: 'CMD-06 (FLANK) [1H➔TANK-00]',
         role: 'pointman',
-        x: alphaX,
-        y: alphaY,
-        battery: 94,
-        activeSector: 1,
+        x: c06X,
+        y: c06Y,
+        battery: 92,
+        activeSector: 2,
         txPowerDbm: 20.0,
         noiseFloorDbm: -95.0,
-        isOffline: alphaOffline,
-        lastOnlineX: 7.0,
-        lastOnlineY: 0.5,
-        hopCount: alphaHop,
-        nextHopId: alphaNextHop,
+        hopCount: t < 5.0 ? 1 : 2,
+        nextHopId: t < 5.0 ? 'TANK-00' : 'CMD-02',
       },
       {
         id: 'CMD-02',
         callsign: 'BRAVO-SUPPORT',
-        displayName: 'BRAVO-SUPPORT',
+        displayName: 'BRAVO-SUPPORT [2H➔C06]',
         role: 'assault',
-        x: -20.0,
-        y: -4.4,
+        x: c02X,
+        y: c02Y,
         battery: 88,
         activeSector: 4,
         txPowerDbm: 20.0,
         noiseFloorDbm: -95.0,
-        hopCount: 2,
-        nextHopId: 'CMD-06',
-      },
-      {
-        id: 'CMD-03',
-        callsign: 'CHARLIE-CORNER',
-        displayName: 'CHARLIE-CORNER',
-        role: 'breacher',
-        x: 17.2,
-        y: 0.5,
-        battery: 86,
-        activeSector: 4,
-        txPowerDbm: 20.0,
-        noiseFloorDbm: -95.0,
-        hopCount: 2,
-        nextHopId: 'CMD-04',
+        hopCount: 1,
+        nextHopId: 'TANK-00',
       },
       {
         id: 'CMD-04',
         callsign: 'DELTA-SCOUT',
-        displayName: 'DELTA-SCOUT',
+        displayName: 'DELTA-SCOUT [1H➔TANK-00]',
         role: 'marksman',
-        x: 4.7,
-        y: 2.5,
+        x: 4.5,
+        y: 3.0,
         battery: 90,
         activeSector: 4,
         txPowerDbm: 20.0,
@@ -310,35 +274,49 @@ export default function TacticalDashboardPage() {
         nextHopId: 'TANK-00',
       },
       {
-        id: 'CMD-05',
-        callsign: 'CMD-05',
-        displayName: 'CMD-05 (UPPER)',
+        id: 'CMD-01',
+        callsign: 'ALPHA-POINT',
+        displayName: 'ALPHA-POINT [2H➔C03]',
         role: 'pointman',
-        x: cmd5X,
-        y: cmd5Y,
-        battery: 92,
-        activeSector: 2,
+        x: 10.0,
+        y: -5.0,
+        battery: 94,
+        activeSector: 1,
         txPowerDbm: 20.0,
         noiseFloorDbm: -95.0,
-        isOffline: cmd5Offline,
-        lastOnlineX: 17.0,
-        lastOnlineY: 2.0,
-        hopCount: 3,
-        nextHopId: 'CMD-03',
+        isOffline: t < 10.0,
+        lastOnlineX: 10.0,
+        lastOnlineY: -5.0,
+        hopCount: t >= 10.0 ? 4 : 99,
+        nextHopId: t >= 10.0 ? 'CMD-03' : 'OFFLINE',
       },
       {
-        id: 'CMD-06',
-        callsign: 'CMD-06',
-        displayName: 'CMD-06 (FLANK)',
+        id: 'CMD-03',
+        callsign: 'CHARLIE-CORNER',
+        displayName: 'CHARLIE-CORNER [2H➔C04]',
+        role: 'breacher',
+        x: 17.5,
+        y: -2.5,
+        battery: 86,
+        activeSector: 4,
+        txPowerDbm: 20.0,
+        noiseFloorDbm: -95.0,
+        hopCount: 2,
+        nextHopId: 'CMD-05',
+      },
+      {
+        id: 'CMD-05',
+        callsign: 'CMD-05',
+        displayName: 'CMD-05 (UPPER) [3H➔C03]',
         role: 'pointman',
-        x: -12.1,
-        y: 1.2,
+        x: 18.5,
+        y: 7.0,
         battery: 92,
         activeSector: 2,
         txPowerDbm: 20.0,
         noiseFloorDbm: -95.0,
-        hopCount: 1,
-        nextHopId: 'TANK-00',
+        hopCount: t >= 10.0 ? 2 : 3,
+        nextHopId: t >= 10.0 ? 'CMD-04' : 'CMD-03',
       },
     ];
 
@@ -393,7 +371,6 @@ export default function TacticalDashboardPage() {
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [systemSinrAvg, setSystemSinrAvg] = useState<number>(24.2);
   const [totalPacketsLogged, setTotalPacketsLogged] = useState<number>(0);
-  const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const currentNodes = mode === 'live'
@@ -410,206 +387,184 @@ export default function TacticalDashboardPage() {
         const simLinks: NodeLink[] = [];
 
         if (t < 5.0) {
-          // Step 1: Ingress & Deployment (LoS Nominal)
-          simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'CMD-04',
-            distanceMeters: 5.3,
-            rssiDbm: -56.0,
-            sinrDb: 28.5,
-            status: 'healthy',
-            videoBitrateKbps: 4800,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'CMD-06',
-            distanceMeters: 12.2,
-            rssiDbm: -64.0,
-            sinrDb: 25.2,
-            status: 'healthy',
-            videoBitrateKbps: 4400,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
+          // KEYFRAME 01: DIRECT WALL OCCLUSION (0.0s - 5.0s) [1.jpeg]
           simLinks.push({
             fromId: 'CMD-06',
-            toId: 'CMD-02',
-            distanceMeters: 9.7,
-            rssiDbm: -62.0,
-            sinrDb: 26.0,
-            status: 'healthy',
-            videoBitrateKbps: 4500,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'CMD-04',
-            toId: 'CMD-03',
-            distanceMeters: 12.6,
-            rssiDbm: -64.0,
-            sinrDb: 25.0,
-            status: 'healthy',
-            videoBitrateKbps: 4400,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'CMD-04',
-            toId: 'CMD-01',
-            distanceMeters: 2.8,
-            rssiDbm: -54.0,
-            sinrDb: 29.5,
-            status: 'healthy',
-            videoBitrateKbps: 4900,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'CMD-03',
-            toId: 'CMD-05',
-            distanceMeters: 2.0,
-            rssiDbm: -53.0,
-            sinrDb: 29.8,
+            toId: 'TANK-00',
+            distanceMeters: 20.0,
+            rssiDbm: -26.0,
+            sinrDb: 35.0,
             status: 'healthy',
             videoBitrateKbps: 5000,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
-        } else if (t < 10.0) {
-          // Step 2: Dual-Wall Occlusion (CMD-01 behind Wall-01, CMD-05 above Wall-02)
           simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'CMD-04',
-            distanceMeters: 5.3,
-            rssiDbm: -56.0,
-            sinrDb: 28.5,
+            fromId: 'CMD-02',
+            toId: 'TANK-00',
+            distanceMeters: 12.8,
+            rssiDbm: -33.0,
+            sinrDb: 33.0,
             status: 'healthy',
-            videoBitrateKbps: 4800,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'CMD-06',
-            distanceMeters: 12.2,
-            rssiDbm: -64.0,
-            sinrDb: 25.2,
-            status: 'healthy',
-            videoBitrateKbps: 4400,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'CMD-06',
-            toId: 'CMD-02',
-            distanceMeters: 9.7,
-            rssiDbm: -62.0,
-            sinrDb: 26.0,
-            status: 'healthy',
-            videoBitrateKbps: 4500,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'CMD-04',
-            toId: 'CMD-03',
-            distanceMeters: 12.6,
-            rssiDbm: -64.0,
-            sinrDb: 25.0,
-            status: 'healthy',
-            videoBitrateKbps: 4400,
+            videoBitrateKbps: 5000,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
           simLinks.push({
             fromId: 'TANK-00',
             toId: 'CMD-01',
-            distanceMeters: 10.4,
-            rssiDbm: -98.0,
-            sinrDb: 2.1,
-            status: 'broken',
-            videoBitrateKbps: 0,
-            isBlockedByWall: true,
-            isMeshRoute: false,
-          });
-          simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'CMD-05',
-            distanceMeters: 20.1,
-            rssiDbm: -96.0,
-            sinrDb: 2.5,
-            status: 'broken',
-            videoBitrateKbps: 0,
-            isBlockedByWall: true,
-            isMeshRoute: false,
-          });
-        } else {
-          // Step 3: Multi-Hop Ad-Hoc Mesh Reroute around both barriers
-          simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'CMD-04',
-            distanceMeters: 5.3,
+            distanceMeters: 11.2,
             rssiDbm: -56.0,
-            sinrDb: 28.5,
+            sinrDb: 4.0,
+            status: 'broken',
+            videoBitrateKbps: 0,
+            isBlockedByWall: true,
+            isMeshRoute: false,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-03',
+            distanceMeters: 17.7,
+            rssiDbm: -56.0,
+            sinrDb: 4.0,
+            status: 'broken',
+            videoBitrateKbps: 0,
+            isBlockedByWall: true,
+            isMeshRoute: false,
+          });
+          simLinks.push({
+            fromId: 'CMD-05',
+            toId: 'CMD-03',
+            distanceMeters: 9.5,
+            rssiDbm: -38.0,
+            sinrDb: 31.0,
             status: 'healthy',
             videoBitrateKbps: 4800,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
+        } else if (t < 10.0) {
+          // KEYFRAME 02: FLANK MESH FORMS (5.0s - 10.0s) [2.jpeg]
+          simLinks.push({
+            fromId: 'CMD-06',
+            toId: 'CMD-02',
+            distanceMeters: 12.4,
+            rssiDbm: -30.0,
+            sinrDb: 34.0,
+            status: 'healthy',
+            videoBitrateKbps: 5000,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'TANK-00',
+            distanceMeters: 14.6,
+            rssiDbm: -33.0,
+            sinrDb: 33.0,
+            status: 'healthy',
+            videoBitrateKbps: 5000,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-01',
+            distanceMeters: 11.2,
+            rssiDbm: -56.0,
+            sinrDb: 4.0,
+            status: 'broken',
+            videoBitrateKbps: 0,
+            isBlockedByWall: true,
+            isMeshRoute: false,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-03',
+            distanceMeters: 17.7,
+            rssiDbm: -56.0,
+            sinrDb: 4.0,
+            status: 'broken',
+            videoBitrateKbps: 0,
+            isBlockedByWall: true,
+            isMeshRoute: false,
+          });
+          simLinks.push({
+            fromId: 'CMD-05',
+            toId: 'CMD-03',
+            distanceMeters: 9.5,
+            rssiDbm: -38.0,
+            sinrDb: 31.0,
+            status: 'healthy',
+            videoBitrateKbps: 4800,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+        } else {
+          // KEYFRAME 03: AD-HOC MESH FULLY RESTORED (10.0s - 15.0s) [3.jpeg]
+          simLinks.push({
+            fromId: 'CMD-06',
+            toId: 'CMD-02',
+            distanceMeters: 12.4,
+            rssiDbm: -30.0,
+            sinrDb: 34.0,
+            status: 'healthy',
+            videoBitrateKbps: 5000,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'CMD-02',
+            toId: 'TANK-00',
+            distanceMeters: 14.6,
+            rssiDbm: -33.0,
+            sinrDb: 33.0,
+            status: 'healthy',
+            videoBitrateKbps: 5000,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
+          simLinks.push({
+            fromId: 'TANK-00',
+            toId: 'CMD-04',
+            distanceMeters: 5.4,
+            rssiDbm: -14.0,
+            sinrDb: 38.0,
+            status: 'healthy',
+            videoBitrateKbps: 5000,
+            isBlockedByWall: false,
+            isMeshRoute: true,
+          });
           simLinks.push({
             fromId: 'CMD-04',
-            toId: 'CMD-03',
-            distanceMeters: 12.6,
-            rssiDbm: -60.0,
-            sinrDb: 26.8,
+            toId: 'CMD-05',
+            distanceMeters: 14.6,
+            rssiDbm: -44.0,
+            sinrDb: 30.0,
             status: 'healthy',
             videoBitrateKbps: 4600,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
           simLinks.push({
-            fromId: 'CMD-03',
-            toId: 'CMD-01',
-            distanceMeters: 9.8,
-            rssiDbm: -58.0,
-            sinrDb: 27.5,
-            status: 'healthy',
-            videoBitrateKbps: 4700,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'CMD-03',
-            toId: 'CMD-05',
-            distanceMeters: 6.7,
-            rssiDbm: -56.0,
-            sinrDb: 28.2,
+            fromId: 'CMD-05',
+            toId: 'CMD-03',
+            distanceMeters: 9.5,
+            rssiDbm: -38.0,
+            sinrDb: 31.0,
             status: 'healthy',
             videoBitrateKbps: 4800,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
           simLinks.push({
-            fromId: 'TANK-00',
-            toId: 'CMD-06',
-            distanceMeters: 12.2,
-            rssiDbm: -64.0,
-            sinrDb: 25.2,
+            fromId: 'CMD-03',
+            toId: 'CMD-01',
+            distanceMeters: 7.9,
+            rssiDbm: -28.0,
+            sinrDb: 35.0,
             status: 'healthy',
-            videoBitrateKbps: 4400,
-            isBlockedByWall: false,
-            isMeshRoute: true,
-          });
-          simLinks.push({
-            fromId: 'CMD-06',
-            toId: 'CMD-02',
-            distanceMeters: 9.7,
-            rssiDbm: -62.0,
-            sinrDb: 26.0,
-            status: 'healthy',
-            videoBitrateKbps: 4500,
+            videoBitrateKbps: 5000,
             isBlockedByWall: false,
             isMeshRoute: true,
           });
@@ -976,57 +931,38 @@ export default function TacticalDashboardPage() {
                   simTime={simTime}
                   simPhaseName={currentSimPhase}
                   onSeekSimTime={setSimTime}
-                  onOpenEditor={() => setIsEditorOpen(true)}
                 />
               </div>
 
-              {/* Simulation Scenario Editor & Keyframe Recorder Modal */}
-              <SimulationEditorModal
-                isOpen={isEditorOpen}
-                onClose={() => setIsEditorOpen(false)}
-                nodes={simNodes}
-                walls={walls}
-                onUpdateNodes={(updated) => {
-                  setSimNodes(updated);
-                  updateTopology(updated, walls, jammer, mode);
-                }}
-                onUpdateWalls={(updated) => {
-                  setWalls(updated);
-                  updateTopology(simNodes, updated, jammer, mode);
-                }}
-                simTime={simTime}
-                onSeekSimTime={setSimTime}
-              />
-
-              {/* 3 Core Tactical Flow Cards - User's Dual-Wall Ad-Hoc Scenario */}
+              {/* 3 Core Tactical Flow Cards - Exact Match to Keyframe Images */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                 <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
-                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>01. INGRESS & FORMATION (0s - 5s)</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
-                    Operatives deploy into sectors: <strong>CMD-06</strong> & <strong>CMD-02</strong> on left flank, <strong>DELTA (CMD-04)</strong> at corner corridor, <strong>ALPHA (CMD-01)</strong> ingressing. All links nominal (<span className="text-emerald-500 font-semibold font-mono">≥ -60 dBm, 🟢 Green</span>).
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
                   <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold uppercase">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
-                    <span>02. DUAL-WALL OCCLUSION (5s - 10s)</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <span>01. KEYFRAME 1: WALL OCCLUSION (0s - 5s)</span>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
-                    <strong>ALPHA (CMD-01)</strong> steps behind <strong>WALL-01</strong> (-28 dB) to (9.1, -5.0) and <strong>CMD-05</strong> moves above <strong>WALL-02</strong> (-24 dB) to (18.8, 7.0). Direct line-of-sight to Base cuts (<span className="text-red-500 font-semibold font-mono">🔴 Red Dashed BLOCKED</span>).
+                    <strong>TOC-ANCHOR</strong> has direct links to <strong>CMD-06</strong> (-26 dBm) & <strong>BRAVO</strong> (-33 dBm). Vertical wall severs direct LoS to <strong>ALPHA-POINT</strong> & <strong>CHARLIE-CORNER</strong> (<span className="text-red-500 font-semibold font-mono">🔴 Red Dashed BLOCKED (-56 dBm)</span>).
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
+                  <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 text-xs font-bold uppercase">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+                    <span>02. KEYFRAME 2: FLANK RELAY (5s - 10s)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
+                    <strong>CMD-06</strong> advances further left to (-26, -1) and establishes relay through <strong>BRAVO-SUPPORT</strong> (-30 dBm), which routes to <strong>TOC-ANCHOR</strong> (-33 dBm). Direct links stay blocked.
                   </p>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm font-mono">
                   <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>03. AD-HOC MESH RESTORED (10s - 15s)</span>
+                    <span>03. KEYFRAME 3: AD-HOC RESTORED (10s - 15s)</span>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
-                    Packets autonomously reroute around obstacles: <strong>ALPHA</strong> ➔ <strong>CHARLIE (CMD-03)</strong> ➔ <strong>DELTA (CMD-04)</strong> ➔ <strong>TANK-00</strong>. <strong>CMD-05</strong> routes via <strong>CHARLIE</strong>. 100% healed (<span className="text-emerald-500 font-semibold font-mono">🟢 All Green</span>).
+                    Full ad-hoc loop routes around obstacles: <strong>TOC</strong> ➔ <strong>DELTA</strong> (-14 dBm) ➔ <strong>CMD-05</strong> (-44 dBm, over wall) ➔ <strong>CHARLIE</strong> (-38 dBm) ➔ <strong>ALPHA</strong> (-28 dBm). All links <span className="text-emerald-500 font-semibold font-mono">🟢 100% Green</span>.
                   </p>
                 </div>
               </div>
