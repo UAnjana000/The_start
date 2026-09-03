@@ -367,14 +367,16 @@ export default function TacticalDashboardPage() {
   const [totalPacketsLogged, setTotalPacketsLogged] = useState<number>(0);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const currentNodes = mode === 'live' ? liveNodes : (activeTab === 'simulate' ? currentSimNodes : simNodes);
+  const currentNodes = mode === 'live'
+    ? liveNodes
+    : (activeTab === 'simulate' && isPlayingSim ? currentSimNodes : simNodes);
   const visibleCurrentNodes = currentNodes.filter((n) => !n.isHidden);
 
   // Recalculate full Ad-Hoc MANET multi-hop topology, links, and ghost nodes
   const updateTopology = useCallback(
     (activeSquad: TacticalNode[], currentWalls: ObstacleWall[], currentJammer: JammerState, currentMode: OperationalMode) => {
-      if (currentMode === 'simulation' && activeTab === 'simulate') {
-        // In 15s NSG simulation, compute dynamic link status based on simTime
+      if (currentMode === 'simulation' && activeTab === 'simulate' && isPlayingSim) {
+        // In 15s automated NSG simulation, compute dynamic link status based on simTime
         const t = simTime;
         const simLinks: NodeLink[] = [];
 
@@ -838,7 +840,41 @@ export default function TacticalDashboardPage() {
 
           {/* TAB 3: SIMULATE (Interactive Simulation Sandbox with Obstacles, Drag-Drop, Jammer) */}
           {activeTab === 'simulate' && (
-            <div className="flex flex-col gap-2 w-full">
+            <div className="flex flex-col gap-3 w-full pb-8">
+              {/* Interactive Status Guidance Bar */}
+              <div className="bg-white dark:bg-slate-900 border border-tactical-border px-4 py-2 flex flex-wrap items-center justify-between gap-2 shadow-sm font-mono text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${isPlayingSim ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                  <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    {isPlayingSim ? '▶ 15s AUTOMATED MISSION SIMULATION RUNNING' : '🖐 INTERACTIVE CQB SANDBOX READY'}
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400 font-sans text-[11px] hidden md:inline">
+                    {isPlayingSim
+                      ? 'Operatives moving automatically along CQB corridor trajectory.'
+                      : 'Click & drag any operative dot freely around concrete walls to test live RF multi-hop routing and AI ghost healing.'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsPlayingSim((prev) => !prev)}
+                    className={`px-3 py-1 text-xs font-bold uppercase rounded-sm border transition-all ${
+                      isPlayingSim
+                        ? 'bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                        : 'bg-sky-50 dark:bg-sky-950 text-tactical-cyan border-sky-300 dark:border-sky-800'
+                    }`}
+                  >
+                    {isPlayingSim ? '⏸ PAUSE (EDIT/DRAG)' : '▶ RUN 15s SIM'}
+                  </button>
+                  <button
+                    onClick={handleResetLayout}
+                    className="px-2.5 py-1 text-xs font-bold uppercase rounded-sm border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                  >
+                    ↺ RESET SQUAD
+                  </button>
+                </div>
+              </div>
+
               {/* Full-Width 2D Node-Link Tactical Simulation Canvas */}
               <div className="w-full">
                 <TacticalCanvas
@@ -860,6 +896,49 @@ export default function TacticalDashboardPage() {
                   simPhaseName={currentSimPhase}
                   onSeekSimTime={setSimTime}
                 />
+              </div>
+
+              {/* 4 Core Tactical Feature Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-tactical-cyan text-xs font-bold uppercase">
+                    <span className="w-2 h-2 rounded-full bg-tactical-cyan" />
+                    <span>1. REAL-WORLD MOVEMENT</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
+                    Operatives advance along building corridors in real-time. Antenna beams dynamically steer towards next-hop peers.
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-tactical-crimson text-xs font-bold uppercase">
+                    <span className="w-2 h-2 rounded-full bg-red-600" />
+                    <span>2. CONCRETE SHADOWING</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
+                    0.35m thick reinforced structural walls inflict -28 dB attenuation, severing direct LoS and triggering 360° search sweeps.
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-tactical-green text-xs font-bold uppercase">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>3. AI GHOST HEALING</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
+                    Predictive spatial optimizer calculates the exact corner coordinate (8.0, 4.5) to drop a lightweight relay node (+22dB gain).
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-tactical-border p-3.5 flex flex-col gap-1.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-sky-600 dark:text-sky-400 text-xs font-bold uppercase">
+                    <span className="w-2 h-2 rounded-full bg-sky-500" />
+                    <span>4. SELF-HEALING MANET</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
+                    Autonomous B.A.T.M.A.N. routing immediately bounces packets around the barrier corner, restoring 100% full telemetry.
+                  </p>
+                </div>
               </div>
             </div>
           )}

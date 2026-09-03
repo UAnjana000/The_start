@@ -73,6 +73,9 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
   const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string, isAnchor?: boolean) => {
     e.stopPropagation();
     if (mode === 'live' || isAnchor) return;
+    if (isPlayingSim && onTogglePlaySim) {
+      onTogglePlaySim();
+    }
     setDraggingNodeId(nodeId);
     onSelectNode(nodeId);
   };
