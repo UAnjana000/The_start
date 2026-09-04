@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { TacticalNode, NodeLink, ObstacleWall, GhostNode, OperationalMode, JammerState } from '../types/tactical';
 import { Crosshair, Shield, RotateCcw, AlertTriangle, Move, Focus, Play, Pause } from 'lucide-react';
 import { SectorBeamforming } from './SectorBeamforming';
@@ -171,6 +171,15 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
     setDraggingNodeId(null);
     setIsPanning(false);
   };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setDraggingNodeId(null);
+      setIsPanning(false);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
 
   const handleResetPan = () => {
     setPanOffset({ x: 0, y: 0 });
@@ -643,6 +652,38 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                       );
                     }
 
+                    // Rotating antenna search for C01 while searching for connection before Keyframe 3
+                    const hasHealthyConnection = links.some(
+                      (l) => (l.fromId === node.id || l.toId === node.id) && l.status === 'healthy'
+                    );
+                    const isC01Searching = node.id === 'CMD-01' && !hasHealthyConnection;
+
+                    if (isC01Searching) {
+                      return (
+                        <g key={`beam-rotating-${node.id}`} transform={`translate(${p.cx}, ${p.cy})`}>
+                          <g>
+                            <path
+                              d="M 0 0 L 44 -18 A 48 48 0 0 1 44 18 Z"
+                              fill="#0284c7"
+                              fillOpacity="0.25"
+                              stroke="#0284c7"
+                              strokeWidth="1.4"
+                              strokeDasharray="3 2"
+                            />
+                            <line x1="0" y1="0" x2="46" y2="0" stroke="#38bdf8" strokeWidth="1.5" opacity="0.9" />
+                            <animateTransform
+                              attributeName="transform"
+                              type="rotate"
+                              from="0"
+                              to="360"
+                              dur="2.4s"
+                              repeatCount="indefinite"
+                            />
+                          </g>
+                        </g>
+                      );
+                    }
+
                     let targetNode = nodes.find((n) => n.id === node.nextHopId && !n.isOffline);
                     if (!targetNode) {
                       const peerLink = links.find((l) => (l.fromId === node.id || l.toId === node.id) && l.status !== 'broken');
@@ -707,9 +748,15 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 top: `${coords.cy}px`,
                 transform: 'translate(-50%, -50%)',
               }}
-              className={`absolute z-20 flex flex-col items-center select-none transition-transform ${
-                isLive || isOffline ? 'cursor-pointer' : 'cursor-grab'
-              } ${isDragging ? 'cursor-grabbing scale-115 shadow-xl z-30' : ''}`}
+              className={`absolute z-20 flex flex-col items-center select-none ${
+                node.isAnchor
+                  ? 'cursor-default'
+                  : isDragging
+                  ? 'cursor-grabbing scale-110 shadow-2xl z-30'
+                  : isPlayingSim
+                  ? 'cursor-pointer'
+                  : 'cursor-grab hover:scale-105 transition-transform'
+              }`}
             >
               {/* Pulsing Alert Ring for Disconnected Nodes (Red Circle at Last Online Pos) */}
               {isOffline && (
@@ -852,24 +899,24 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 01: INGRESS (0s)
               </button>
               <button
-                onClick={() => onSeekSimTime && onSeekSimTime(5.0)}
+                onClick={() => onSeekSimTime && onSeekSimTime(7.5)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 5.0 && simTime < 10.0
+                  simTime >= 5.0 && simTime < 10.5
                     ? 'bg-red-950 text-red-300 border-red-600 shadow-sm ring-1 ring-red-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                02: DUAL-WALL BLOCKED (5s)
+                02: FLANK MESH (7.5s)
               </button>
               <button
-                onClick={() => onSeekSimTime && onSeekSimTime(10.0)}
+                onClick={() => onSeekSimTime && onSeekSimTime(10.5)}
                 className={`px-1.5 py-1 text-center font-bold rounded-sm border transition-all ${
-                  simTime >= 10.0
+                  simTime >= 10.5
                     ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/50'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                 }`}
               >
-                03: AD-HOC MESH (10s)
+                03: AD-HOC MESH (10.5s)
               </button>
             </div>
 

@@ -6,7 +6,6 @@ import {
   NodeLink,
   GhostNode,
   LanguageKey,
-  NodeRole,
 } from '../types/tactical';
 import { translations } from '../utils/translations';
 import {
@@ -22,10 +21,7 @@ import {
   MapPin,
   Check,
   X,
-  Plus,
   Shield,
-  Layers,
-  Activity,
   AlertCircle,
 } from 'lucide-react';
 
@@ -38,7 +34,7 @@ interface NodesTabProps {
   onUpdateNodeName: (id: string, newCallsign: string) => void;
   onToggleHideNode: (id: string) => void;
   onToggleNodeConnection: (id: string) => void;
-  onAddNode: (newNode: TacticalNode) => void;
+  onAddNode?: (newNode: TacticalNode) => void;
   language: LanguageKey;
 }
 
@@ -51,21 +47,12 @@ export const NodesTab: React.FC<NodesTabProps> = ({
   onUpdateNodeName,
   onToggleHideNode,
   onToggleNodeConnection,
-  onAddNode,
   language,
 }) => {
   const t = translations[language];
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'hidden'>('active');
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState<string>('');
-  const [showAddModal, setShowAddModal] = useState<boolean>(false);
-
-  // New Node Form State
-  const [newId, setNewId] = useState<string>('CMD-06');
-  const [newCallsign, setNewCallsign] = useState<string>('FOXTROT-RECON');
-  const [newRole, setNewRole] = useState<NodeRole>('scout_relay');
-  const [newX, setNewX] = useState<number>(10.0);
-  const [newY, setNewY] = useState<number>(-5.0);
 
   const activeNodes = nodes.filter((n) => !n.isHidden);
   const hiddenNodes = nodes.filter((n) => n.isHidden);
@@ -80,27 +67,6 @@ export const NodesTab: React.FC<NodesTabProps> = ({
       onUpdateNodeName(id, editNameValue.trim());
     }
     setEditingNodeId(null);
-  };
-
-  const handleCreateNode = (e: React.FormEvent) => {
-    e.preventDefault();
-    const createdNode: TacticalNode = {
-      id: newId.trim().toUpperCase(),
-      callsign: newCallsign.trim().toUpperCase(),
-      displayName: newCallsign.trim().toUpperCase(),
-      role: newRole,
-      x: newX,
-      y: newY,
-      battery: 95,
-      activeSector: 1,
-      txPowerDbm: 20.0,
-      noiseFloorDbm: -95.0,
-      isAnchor: false,
-    };
-    onAddNode(createdNode);
-    setShowAddModal(false);
-    setNewId(`CMD-0${nodes.length + 2}`);
-    setNewCallsign('OPERATOR-' + (nodes.length + 2));
   };
 
   return (
@@ -144,14 +110,6 @@ export const NodesTab: React.FC<NodesTabProps> = ({
               {t.hiddenNodesTab} ({hiddenNodes.length})
             </button>
           </div>
-
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 bg-tactical-cyan hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 border border-sky-600 shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>DEPLOY NODE</span>
-          </button>
         </div>
       </div>
 
@@ -159,7 +117,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
       {activeSubTab === 'active' ? (
         activeNodes.length === 0 ? (
           <div className="bg-white dark:bg-slate-900 border border-tactical-border p-12 text-center text-slate-500">
-            No active nodes currently deployed. Click Deploy Node to add squad members.
+            No active nodes currently deployed.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -174,10 +132,12 @@ export const NodesTab: React.FC<NodesTabProps> = ({
                 <div
                   key={node.id}
                   onClick={() => onSelectNode(node.id)}
-                  className={`relative bg-white dark:bg-slate-900 border p-4 flex flex-col justify-between gap-4 transition-all shadow-sm ${
-                    isSelected
-                      ? 'border-tactical-cyan ring-1 ring-tactical-cyan/40'
-                      : 'border-tactical-border hover:border-slate-400 dark:hover:border-slate-600'
+                  className={`relative border p-4 flex flex-col justify-between gap-4 transition-all shadow-sm ${
+                    isOffline
+                      ? 'border-red-500/70 bg-red-50/20 dark:bg-red-950/20 ring-1 ring-red-500/30'
+                      : isSelected
+                      ? 'bg-white dark:bg-slate-900 border-tactical-cyan ring-1 ring-tactical-cyan/40'
+                      : 'bg-white dark:bg-slate-900 border-tactical-border hover:border-slate-400 dark:hover:border-slate-600'
                   }`}
                 >
                   {/* Top Bar: Role badge, Offline/Online Status Pill, ID */}
@@ -209,7 +169,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
                       {isOffline ? (
                         <span className="flex items-center gap-1 bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800 px-2 py-0.5 text-[10px] font-bold animate-pulse">
                           <span className="w-2 h-2 rounded-full bg-red-600" />
-                          {t.statusDisconnected}
+                          OFFLINE // FAR OBSTACLE OCCLUSION
                         </span>
                       ) : (
                         <span className="flex items-center gap-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-2 py-0.5 text-[10px] font-bold">
@@ -294,7 +254,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
                         <span>{t.activeBeamSector}:</span>
                       </div>
                       <span className="font-bold text-[11px] text-sky-700 dark:text-sky-300">
-                        SEC #{node.activeSector}
+                        {isOffline ? 'SECTOR SCANNING' : `SEC #${node.activeSector}`}
                       </span>
                     </div>
 
@@ -306,7 +266,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
                       <span
                         className={`font-bold text-[11px] ${
                           isOffline
-                            ? 'text-red-500'
+                            ? 'text-red-500 font-extrabold animate-pulse'
                             : sinr >= 14
                             ? 'text-emerald-600 dark:text-emerald-400'
                             : 'text-amber-600'
@@ -328,17 +288,29 @@ export const NodesTab: React.FC<NodesTabProps> = ({
                   </div>
 
                   {/* Multi-Hop Relay Breadcrumb */}
-                  <div className="bg-sky-50 dark:bg-slate-800/80 border border-sky-200 dark:border-slate-700 p-2 text-[10.5px]">
+                  <div className={`p-2 text-[10.5px] border ${
+                    isOffline
+                      ? 'bg-red-50/60 dark:bg-red-950/40 border-red-300 dark:border-red-800/60'
+                      : 'bg-sky-50 dark:bg-slate-800/80 border-sky-200 dark:border-slate-700'
+                  }`}>
                     <span className="text-slate-500 dark:text-slate-400 font-semibold">
                       MANET ROUTE:{' '}
                     </span>
-                    <span className="text-sky-800 dark:text-sky-300 font-bold">
-                      {node.routePath ? node.routePath.join(' ➔ ') : `${node.id} ➔ TANK-00`}
-                    </span>
-                    {node.hopCount !== undefined && (
-                      <span className="ml-2 text-[9.5px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-1 py-0.2">
-                        {node.hopCount} HOPS
+                    {isOffline ? (
+                      <span className="text-red-600 dark:text-red-400 font-bold">
+                        ⚠ SIGNAL SEVERED // FAR WALL OCCLUSION (0.0 kB/s)
                       </span>
+                    ) : (
+                      <>
+                        <span className="text-sky-800 dark:text-sky-300 font-bold">
+                          {node.routePath ? node.routePath.join(' ➔ ') : `${node.id} ➔ TANK-00`}
+                        </span>
+                        {node.hopCount !== undefined && (
+                          <span className="ml-2 text-[9.5px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-1 py-0.2">
+                            {node.hopCount} HOPS
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -434,117 +406,6 @@ export const NodesTab: React.FC<NodesTabProps> = ({
             ))}
           </div>
         )
-      )}
-
-      {/* Deploy New Node Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-tactical-border max-w-md w-full p-6 shadow-xl flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4 text-tactical-cyan" />
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white uppercase">
-                  DEPLOY NEW CQB-MANET NODE
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateNode} className="flex flex-col gap-3 text-xs">
-              <div>
-                <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  NODE IDENTIFIER (e.g. CMD-06)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newId}
-                  onChange={(e) => setNewId(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono uppercase outline-none text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  TACTICAL CALLSIGN
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newCallsign}
-                  onChange={(e) => setNewCallsign(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono uppercase outline-none text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  OPERATIONAL SQUAD ROLE
-                </label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value as NodeRole)}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono uppercase outline-none text-slate-900 dark:text-white"
-                >
-                  <option value="pointman">POINTMAN</option>
-                  <option value="assault">ASSAULT</option>
-                  <option value="breacher">BREACHER</option>
-                  <option value="marksman">MARKSMAN</option>
-                  <option value="scout_relay">SCOUT RELAY</option>
-                  <option value="uav_relay">UAV RELAY</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    START X (METERS)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={newX}
-                    onChange={(e) => setNewX(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono outline-none text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    START Y (METERS)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={newY}
-                    onChange={(e) => setNewY(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono outline-none text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200"
-                >
-                  {t.cancel}
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-tactical-cyan hover:bg-sky-700 text-white font-bold"
-                >
-                  DEPLOY NODE TO MESH
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );
