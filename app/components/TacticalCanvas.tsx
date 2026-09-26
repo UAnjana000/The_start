@@ -775,11 +775,11 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                     : 'bg-sky-500/20 hover:bg-sky-500/30 border-2 border-sky-400 text-sky-200'
                 }`}
               >
-                {node.isAnchor ? (
+                {node.isAnchor || node.id === 'Gateway' ? (
                   <Shield className="w-5 h-5 text-sky-400" />
                 ) : (
                   <span className="text-[10px] font-black">
-                    {node.id.replace('CMD-', 'C')}
+                    {node.id.replace('Node ', 'N').replace('CMD-', 'C')}
                   </span>
                 )}
 
@@ -808,9 +808,9 @@ export const TacticalCanvas: React.FC<TacticalCanvasProps> = ({
                 <span className={`ml-1 ${isOffline ? 'text-red-400' : 'text-sky-400'}`}>
                   {isOffline
                     ? '[SEVERED]'
-                    : node.isAnchor
-                    ? '[TOC]'
-                    : `[${node.hopCount ?? 1}H➔${node.nextHopId?.replace('CMD-', 'C')}]`}
+                    : node.isAnchor || node.id === 'Gateway'
+                    ? '[BASE]'
+                    : `[${node.hopCount ?? 1}H➔${node.nextHopId?.replace('Node ', 'N').replace('CMD-', 'C')}]`}
                 </span>
               </div>
             </div>

@@ -1,15 +1,14 @@
 /*
- * mesh_gateway.ino  --  ESP32 dev module (WROOM-32)
+ * mesh_gateway.c (or mesh_gateway.ino) -- ESP32 Dev Module (WROOM-32)
  *
- * ESP-NOW sink -> Firebase Realtime Database.
+ * Tactical Base Station Mesh Sink & Cloud/Video Bridge featuring:
+ * 1. AES-128 Decrypted ESP-NOW Reception from Ad-Hoc MANET.
+ * 2. Multi-Hop Deduplication and Best-Path Selection based on hops and RSSI.
+ * 3. Dynamic Ad-Hoc Topology & Antenna State Uplink to Firebase RTDB.
+ * 4. Dual-Mode AP+STA (Station for Cloud/WebSockets, SoftAP Beacon 'MESH-GW').
+ * 5. Video Stream Bridge / Proxy Health Verification.
  *
- * Runs AP_STA:
- *   STA -> home router, gives internet uplink and fixes the ESP-NOW channel.
- *   AP  -> beacon named GW_AP_SSID. Nodes scan for it to learn our channel and
- *          to measure their own RSSI toward the gateway. Nobody associates to it.
- *
- * Requires Arduino-ESP32 core 3.x (esp_now_recv_info_t signature).
- * Libraries: ArduinoJson v7.
+ * Requires Arduino-ESP32 Core 3.x, ArduinoJson v7.
  */
 
 #include <WiFi.h>
@@ -19,30 +18,30 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 
-// MeshPacket, RxItem and NodeRec live here. They must NOT be declared in the
-// .ino: the Arduino preprocessor injects generated function prototypes above
-// any typedef in the sketch, which breaks findOrAdd() and rxPop().
+// Protocol definitions, packet structs & AES-128 CBC crypto
 #include "mesh_proto.h"
 
-// ---------------------------------------------------------------- config ---
-
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 static const char* WIFI_SSID = "ACT-ai_102711948432";
 static const char* WIFI_PASS = "83221436";
-static const char* DB_URL =
-  "https://apparatus-certified-default-rtdb.asia-southeast1.firebasedatabase.app";
+static const char* DB_URL    = "https://apparatus-certified-default-rtdb.asia-southeast1.firebasedatabase.app";
 
-// Must match GW_AP_SSID in both node sketches.
+// Beacon SSID for soldier nodes to find channel & measure RSSI
 static const char* GW_AP_SSID = "MESH-GW";
 static const char* GW_AP_PASS = "meshgw12345";
 
-static const uint32_t UPLOAD_INTERVAL_MS = 5000;
+// Video Stream Target Endpoint
+static const char* CAM_STREAM_URL = "http://esp32-c6-cam.local/stream";
+
+static const uint32_t UPLOAD_INTERVAL_MS = 4000;
 static const uint32_t NODE_STALE_MS      = 60000;
 static const uint8_t  MAX_NODES          = 16;
 
-// ------------------------------------------------------------ rx plumbing --
-// The ESP-NOW callback runs on the WiFi task while loop() may be blocked for
-// seconds inside an HTTPS PATCH, so the callback only enqueues.
-
+// ============================================================================
+// RX PLUMBING (FreeRTOS Ring Buffer)
+// ============================================================================
 #define RX_QUEUE_LEN 24
 static RxItem          rxq[RX_QUEUE_LEN];
 static volatile uint8_t rxHead = 0;
@@ -50,13 +49,15 @@ static volatile uint8_t rxTail = 0;
 static portMUX_TYPE     rxMux  = portMUX_INITIALIZER_UNLOCKED;
 static volatile uint32_t rxDropped = 0;
 
-static void onEspNowRecv(const esp_now_recv_info_t* info,
-                         const uint8_t* data, int len) {
+static void onEspNowRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
   if (len != (int)sizeof(MeshPacket)) return;
 
+  // Decrypt incoming payload with AES-128-CBC
   MeshPacket p;
-  memcpy(&p, data, sizeof(p));
-  if (p.magic != MESH_MAGIC || p.ver != MESH_VER) return;
+  if (!decryptMeshPacket(data, len, &p)) {
+    // Drop malformed / foreign / undecryptable packets
+    return;
+  }
 
   int8_t rssi = (info && info->rx_ctrl) ? (int8_t)info->rx_ctrl->rssi : -128;
 
@@ -65,9 +66,10 @@ static void onEspNowRecv(const esp_now_recv_info_t* info,
   if (next == rxTail) {
     rxDropped++;
   } else {
-    rxq[rxHead].p      = p;
-    rxq[rxHead].rssiGw = rssi;
-    rxHead             = next;
+    rxq[rxHead].p           = p;
+    rxq[rxHead].rssiGw      = rssi;
+    rxq[rxHead].rxTimestamp = millis();
+    rxHead                  = next;
   }
   portEXIT_CRITICAL(&rxMux);
 }
@@ -84,14 +86,15 @@ static bool rxPop(RxItem* out) {
   return got;
 }
 
-// ------------------------------------------------------------ node table --
-
+// ============================================================================
+// NODE STATE TABLE & DYNAMIC TOPOLOGY
+// ============================================================================
 static NodeRec nodes[MAX_NODES];
 
 static NodeRec* findOrAdd(uint8_t id) {
-  for (uint8_t i = 0; i < MAX_NODES; i++)
+  for (uint8_t i = 0; i < MAX_NODES; i++) {
     if (nodes[i].used && nodes[i].id == id) return &nodes[i];
-
+  }
   for (uint8_t i = 0; i < MAX_NODES; i++) {
     if (!nodes[i].used) {
       nodes[i]      = {};
@@ -104,18 +107,10 @@ static NodeRec* findOrAdd(uint8_t id) {
   return nullptr;
 }
 
-/*
- * Flooding means the same packet can arrive by several paths. Keep the newest
- * sequence number, and within one sequence keep the copy that took the fewest
- * hops -- that copy's RSSI is the one worth reporting.
- *
- * Caveat worth remembering: for hops > 0, rssiGw describes the last relay's
- * transmission, not the original node's. Only hops == 0 is a direct measurement.
- */
 static void handlePacket(const MeshPacket& p, int8_t rssiGw) {
   NodeRec* r = findOrAdd(p.srcId);
   if (!r) {
-    Serial.printf("[mesh] node table full, dropping node-%u\n", p.srcId);
+    Serial.printf("[mesh] Node table full, dropping Node-%u\n", p.srcId);
     return;
   }
 
@@ -133,17 +128,21 @@ static void handlePacket(const MeshPacket& p, int8_t rssiGw) {
     r->rssiGw = rssiGw;
   }
 
-  r->seenOnce = true;
-  r->lat      = p.lat;
-  r->lon      = p.lon;
-  r->rssiNode = p.rssiNode;
-  r->antenna  = p.antenna;
-  r->lastMs   = millis();
-  r->dirty    = true;
+  r->seenOnce    = true;
+  r->lat         = p.lat;
+  r->lon         = p.lon;
+  r->rssiNode    = p.rssiNode;
+  r->antenna     = p.antenna;
+  r->bestRelayId = p.bestRelayId;
+  r->linkRssi    = p.linkRssi;
+  r->hasVideo    = p.hasVideo;
+  r->lastMs      = millis();
+  r->dirty       = true;
 }
 
-// ----------------------------------------------------------- firebase ------
-
+// ============================================================================
+// FIREBASE REALTIME DATABASE UPLINK
+// ============================================================================
 static void uploadAll() {
   JsonDocument out;
   uint8_t  included[MAX_NODES];
@@ -161,12 +160,15 @@ static void uploadAll() {
     o["lon"]       = nodes[i].lon;
     o["ts"][".sv"] = "timestamp";
 
-    JsonObject d  = o["data"].to<JsonObject>();
-    d["rssiNode"] = nodes[i].rssiNode;
-    d["rssiGw"]   = nodes[i].rssiGw;
-    d["antenna"]  = nodes[i].antenna;
-    d["hops"]     = nodes[i].hops;
-    d["seq"]      = nodes[i].seq;
+    JsonObject d   = o["data"].to<JsonObject>();
+    d["rssiNode"]    = nodes[i].rssiNode;
+    d["rssiGw"]      = nodes[i].rssiGw;
+    d["antenna"]     = nodes[i].antenna;
+    d["hops"]        = nodes[i].hops;
+    d["seq"]         = nodes[i].seq;
+    d["bestRelayId"] = nodes[i].bestRelayId;
+    d["linkRssi"]    = nodes[i].linkRssi;
+    d["hasVideo"]    = nodes[i].hasVideo;
 
     included[n++] = i;
   }
@@ -177,43 +179,63 @@ static void uploadAll() {
   serializeJson(out, body);
 
   WiFiClientSecure client;
-  client.setInsecure();   // prototype only: no cert pinning
+  client.setInsecure();
 
   HTTPClient http;
   if (!http.begin(client, String(DB_URL) + "/nodes.json")) {
-    Serial.println("[fb] begin failed");
+    Serial.println("[fb] Connection initialization failed");
     return;
   }
-  http.setTimeout(10000);
+  http.setTimeout(8000);
   http.addHeader("Content-Type", "application/json");
 
   int code = http.PATCH(body);
   if (code == 200) {
-    Serial.printf("[fb] ok, %u nodes, %u bytes\n", n, body.length());
+    Serial.printf("[fb] Sync success: %u nodes updated (%u bytes)\n", n, body.length());
     for (uint8_t i = 0; i < n; i++) nodes[included[i]].dirty = false;
   } else {
-    Serial.printf("[fb] %d %s\n", code,
-                  code > 0 ? http.getString().c_str()
-                           : http.errorToString(code).c_str());
+    Serial.printf("[fb] Error %d: %s\n", code,
+                  code > 0 ? http.getString().c_str() : http.errorToString(code).c_str());
   }
   http.end();
 }
 
-// ---------------------------------------------------------------- setup ---
+// ============================================================================
+// CAMERA STREAM BRIDGE PING / HEALTH CHECK
+// ============================================================================
+static void checkVideoHealth() {
+  if (WiFi.status() != WL_CONNECTED) return;
 
+  HTTPClient http;
+  http.begin(CAM_STREAM_URL);
+  http.setTimeout(2500);
+  int httpCode = http.GET();
+  if (httpCode > 0) {
+    Serial.printf("[cam-bridge] C6 Video Stream alive, HTTP status: %d\n", httpCode);
+  } else {
+    Serial.printf("[cam-bridge] C6 Video offline / unresolvable: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
+}
+
+// ============================================================================
+// SETUP & MAIN LOOP
+// ============================================================================
 void setup() {
   Serial.begin(115200);
   delay(200);
+  Serial.println("\n[gateway] Booting Tactical Mesh Gateway & Video Bridge...");
 
   WiFi.mode(WIFI_AP_STA);
-  WiFi.setSleep(false);   // power save eats ESP-NOW packets
+  WiFi.setSleep(false);
 
+  // SoftAP Beacon for soldier node channel tracking
   if (!WiFi.softAP(GW_AP_SSID, GW_AP_PASS)) {
-    Serial.println("[wifi] softAP failed");
+    Serial.println("[wifi] softAP beacon startup failed");
   }
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.print("[wifi] connecting");
+  Serial.print("[wifi] Connecting to command router");
   uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < 30000) {
     delay(300);
@@ -221,65 +243,62 @@ void setup() {
   }
   Serial.println();
 
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[wifi] no uplink, continuing -- mesh rx still works");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("[wifi] Uplink connected! Gateway IP: %s\n", WiFi.localIP().toString().c_str());
   } else {
-    Serial.printf("[wifi] %s\n", WiFi.localIP().toString().c_str());
+    Serial.println("[wifi] Router unavailable, local mesh reception remains active");
   }
 
-  // The AP follows the STA channel. Nodes discover it by scanning, so we never
-  // force a channel here -- doing so would break the router association.
   uint8_t ch = 0;
   wifi_second_chan_t sec;
   esp_wifi_get_channel(&ch, &sec);
-  Serial.printf("[wifi] espnow channel %u, ap ssid '%s'\n", ch, GW_AP_SSID);
+  Serial.printf("[wifi] Operating on Channel %u with SoftAP '%s'\n", ch, GW_AP_SSID);
 
   if (esp_now_init() != ESP_OK) {
-    Serial.println("[espnow] init failed, restarting");
+    Serial.println("[espnow] Init failed, restarting...");
     delay(2000);
     ESP.restart();
   }
   esp_now_register_recv_cb(onEspNowRecv);
-  Serial.println("[espnow] listening");
+  Serial.println("[espnow] AES-128 Encrypted Mesh Sink listening");
 }
-
-// ----------------------------------------------------------------- loop ---
 
 void loop() {
   static uint32_t lastUpload   = 0;
   static uint32_t lastWifiTry  = 0;
-  static uint32_t lastChanLog  = 0;
+  static uint32_t lastCamPing  = 0;
 
+  // Process incoming decrypted mesh packets from FreeRTOS queue
   RxItem it;
   while (rxPop(&it)) {
     handlePacket(it.p, it.rssiGw);
-    Serial.printf("[mesh] node-%u seq=%u hops=%u ant=%u rssiNode=%d rssiGw=%d\n",
+    Serial.printf("[mesh] Node-%u | Seq=%u | Hops=%u | Ant=%u | BestRelay=Node-%u | RSSI_Gw=%d | RSSI_Link=%d | Video=%d\n",
                   it.p.srcId, it.p.seq, it.p.hops, it.p.antenna,
-                  it.p.rssiNode, it.rssiGw);
+                  it.p.bestRelayId, it.rssiGw, it.p.linkRssi, it.p.hasVideo);
   }
 
   if (rxDropped) {
-    Serial.printf("[mesh] rx queue overflow x%lu\n", (unsigned long)rxDropped);
+    Serial.printf("[mesh] Warning: RX buffer overflow (%lu packets dropped)\n", (unsigned long)rxDropped);
     rxDropped = 0;
   }
 
+  // WiFi Reconnection handling
   if (WiFi.status() != WL_CONNECTED) {
     if (millis() - lastWifiTry > 10000) {
       lastWifiTry = millis();
-      Serial.println("[wifi] reconnecting");
+      Serial.println("[wifi] Reconnecting to router...");
       WiFi.reconnect();
     }
     return;
   }
 
-  if (millis() - lastChanLog > 60000) {
-    lastChanLog = millis();
-    uint8_t ch = 0;
-    wifi_second_chan_t sec;
-    esp_wifi_get_channel(&ch, &sec);
-    Serial.printf("[wifi] channel %u\n", ch);
+  // Periodic Camera Stream Health Check (every 15 seconds)
+  if (millis() - lastCamPing >= 15000) {
+    lastCamPing = millis();
+    checkVideoHealth();
   }
 
+  // Periodic Firebase Cloud Uplink (every 4 seconds)
   if (millis() - lastUpload >= UPLOAD_INTERVAL_MS) {
     lastUpload = millis();
     uploadAll();

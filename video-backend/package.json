@@ -1,0 +1,15 @@
+{
+  "name": "tactical-helmet-video-backend",
+  "version": "1.0.0",
+  "description": "High-throughput MJPEG-to-WebSocket Video Relay & Topology Bridge for ESP32-C6 Helmet Nodes",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}

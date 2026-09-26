@@ -6,7 +6,7 @@ export interface TacticalNode {
   callsign: string;
   displayName?: string;
   role: NodeRole;
-  x: number; // relative coordinate in meters (TANK-00 is at 0,0)
+  x: number; // relative coordinate in meters (GATEWAY is at 0,0)
   y: number;
   battery: number; // percentage (0 - 100)
   activeSector: number; // 1, 2, 3, 4 (smart beamforming conformal array)
@@ -14,15 +14,25 @@ export interface TacticalNode {
   noiseFloorDbm: number;
   isAnchor?: boolean;
   videoActive?: boolean;
-  hopCount?: number; // Multi-hop MANET hop count to TANK-00
+  hopCount?: number; // Multi-hop MANET hop count to GATEWAY
   nextHopId?: string; // Direct upstream mesh relay
-  routePath?: string[]; // Full breadcrumb chain (e.g. ["CMD-05", "CMD-03", "CMD-01", "TANK-00"])
+  routePath?: string[]; // Full breadcrumb chain (e.g. ["Node 3", "Node 2", "GATEWAY"])
   bottleneckSinrDb?: number;
   isOffline?: boolean; // True when node loses connection
   lastOnlineX?: number; // Last known coordinates before connection loss
   lastOnlineY?: number;
   lastOnlineTimestamp?: number;
   isHidden?: boolean; // When deleted/hidden from primary view
+  // Enhanced Nodal Identity, Geolocation, Kinematics & ML Early Warning
+  deviceId?: string; // Hardware MAC / UID (e.g. "XIAO-ESP32-C6-A1F4")
+  lat?: number; // Geolocation latitude
+  lon?: number; // Geolocation longitude
+  movementSpeedMs?: number; // Operator movement speed in m/s
+  pdrPct?: number; // Packet Delivery Ratio %
+  rssiDbm?: number; // Received Signal Strength in dBm
+  sinrDb?: number; // Signal to Interference plus Noise Ratio in dB
+  mlRiskScore?: number; // 0-100% predicted failure probability within next 5s
+  mlWarning?: string; // Actionable micro-movement advice (e.g. "Step 1.5m East to maintain LOS")
 }
 
 export interface NodeLink {
