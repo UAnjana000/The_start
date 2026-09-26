@@ -202,7 +202,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         {/* Component Specification Matrix */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 text-xs">
           <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3">
-            <div className="text-tactical-cyan font-bold uppercase mb-1">1. XIAO ESP32-C6 EDGE HARDWARE</div>
+            <div className="text-tactical-cyan font-bold uppercase mb-1">1. ESP32-S EDGE HARDWARE</div>
             <div className="text-slate-600 dark:text-slate-400 text-[11px] font-sans">
               Dual RF switches: Internal switch (GPIO 3/14) routes to external u.FL, driving external AS179-92LF SPDT (Pin 4/5 / D4/D5) for dynamic antenna beam diversity. Broadcasts 32-byte binary <code className="text-sky-600 dark:text-sky-400 font-mono font-bold">MeshPacket</code> structures over ESP-NOW.
             </div>

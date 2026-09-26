@@ -21,6 +21,13 @@ const HTTP_PORT = process.env.HTTP_PORT || 8081;
 
 // Default node video stream sources (can be expanded for multiple soldier helmets)
 const STREAM_SOURCES = {
+  's3-cam': {
+    id: 's3-cam',
+    name: 'ESP32-S3 Helmet Cam Test',
+    url: process.env.CAM_URL_S3 || 'http://esp32-s3-cam.local/stream',
+    fallbackIpUrl: 'http://192.168.4.1/stream',
+    active: true
+  },
   'node-3': {
     id: 'node-3',
     name: 'ESP32-C6 Helmet Node 3',
@@ -30,7 +37,7 @@ const STREAM_SOURCES = {
   }
 };
 
-let activeStreamNode = 'node-3';
+let activeStreamNode = 's3-cam';
 
 // ============================================================================
 // EXPRESS REST API (Health & Diagnostics)

@@ -194,7 +194,7 @@ export const AlertsTab: React.FC<AlertsTabProps> = ({
             TACTICAL MESH NETWORK FULLY CONNECTED
           </h2>
           <p className="text-xs text-slate-600 dark:text-slate-400 max-w-lg font-sans leading-relaxed mb-6">
-            All active operator helmet nodes (XIAO ESP32-C6) are streaming continuous telemetry to the TOC Gateway within the 15-second heartbeat window.
+            All active operator helmet nodes (ESP32-S) are streaming continuous telemetry to the TOC Gateway within the 15-second heartbeat window.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl w-full text-left">
@@ -349,7 +349,7 @@ export const AlertsTab: React.FC<AlertsTabProps> = ({
                     </span>
                   </div>
                   <div className="text-[10.5px] text-slate-500 font-mono mt-0.5">
-                    HARDWARE UID: <span className="text-slate-700 dark:text-slate-300 font-bold">{n.deviceId || 'XIAO-ESP32-C6-4B1C'}</span> • GPS: ({n.lat ?? 28.61425}°, {n.lon ?? 77.20950}°)
+                    HARDWARE UID: <span className="text-slate-700 dark:text-slate-300 font-bold">{n.deviceId || 'ESP32-S-4B1C'}</span> • GPS: ({n.lat ?? 28.61425}°, {n.lon ?? 77.20950}°)
                   </div>
                 </div>
               </div>

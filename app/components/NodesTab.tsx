@@ -162,7 +162,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
                             {node.id}
                           </span>
                           <span className="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-300 dark:border-slate-700">
-                            {node.deviceId || 'ESP32-C6'}
+                            {node.deviceId || 'ESP32-S'}
                           </span>
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wide">

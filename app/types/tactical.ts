@@ -24,7 +24,7 @@ export interface TacticalNode {
   lastOnlineTimestamp?: number;
   isHidden?: boolean; // When deleted/hidden from primary view
   // Enhanced Nodal Identity, Geolocation, Kinematics & ML Early Warning
-  deviceId?: string; // Hardware MAC / UID (e.g. "XIAO-ESP32-C6-A1F4")
+  deviceId?: string; // Hardware MAC / UID (e.g. "ESP32-S-A1F4")
   lat?: number; // Geolocation latitude
   lon?: number; // Geolocation longitude
   movementSpeedMs?: number; // Operator movement speed in m/s

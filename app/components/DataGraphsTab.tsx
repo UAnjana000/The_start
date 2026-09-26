@@ -134,7 +134,7 @@ export const DataGraphsTab: React.FC<DataGraphsTabProps> = ({ language }) => {
           <div className="text-xl font-extrabold text-amber-600 dark:text-amber-400 font-mono mt-1">
             1.42 ms
           </div>
-          <div className="text-[9px] text-slate-400 font-sans">ESP32-C6 Edge Eval</div>
+          <div className="text-[9px] text-slate-400 font-sans">ESP32-S Edge Eval</div>
         </div>
       </div>
 

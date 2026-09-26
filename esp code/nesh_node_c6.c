@@ -42,15 +42,25 @@ static const uint32_t RELAY_JITTER_MAX_MS  = 35;
 static const int8_t   DIRECT_GW_THRESH_DBM = -75;  // Below -75 dBm, consider relaying via neighbor
 
 // ============================================================================
-// HARDWARE PIN DEFINITIONS (Seeed XIAO ESP32-C6 & AS179-92LF RF Switch)
+// DUAL-ANTENNA DIVERSITY HARDWARE CONFIGURATION (2 Antennas on C6 / ESP32-S)
 // ============================================================================
-#define XIAO_RF_EN_PIN     3     // LOW enables on-board RF switch
-#define XIAO_ANT_SEL_PIN   14    // HIGH routes RF to external u.FL
-#define AS179_V1_PIN       22    // D4 (GPIO22 on XIAO C6)
-#define AS179_V2_PIN       23    // D5 (GPIO23 on XIAO C6)
+// Antenna 1: Front Sector Patch Antenna (Directional beam, High Forward Gain)
+// Antenna 2: Rear Sector Whip/Omni Antenna (Broad coverage, Rearward Facing)
+#define ANTENNA_1_FRONT    1
+#define ANTENNA_2_REAR     2
 
-static const uint16_t AS179_SETTLE_MS   = 5;
-static const int8_t   ANT_HYSTERESIS_DB = 4;
+// RF Switching Hardware Control (Skyworks AS179-92LF / PE4259 SPDT Switch)
+// Seeed XIAO ESP32-C6: D4 (GPIO22) and D5 (GPIO23)
+// Bare ESP32-S / ESP32-C6 DevKit: GPIO4 and GPIO5
+#define AS179_V1_PIN       22    // Complementary control line 1 (HIGH = Ant 1 Front)
+#define AS179_V2_PIN       23    // Complementary control line 2 (HIGH = Ant 2 Rear)
+
+// Seeed on-board RF switch multiplexer
+#define XIAO_RF_EN_PIN     3     // LOW enables on-board RF switch
+#define XIAO_ANT_SEL_PIN   14    // HIGH routes RF from ceramic chip to external u.FL port
+
+static const uint16_t AS179_SETTLE_MS   = 5;   // RF switch settling time
+static const int8_t   ANT_HYSTERESIS_DB = 4;   // 4 dB hysteresis prevents rapid antenna flapping
 
 // ============================================================================
 // CAMERA PIN CONFIGURATION (OV2640 / Standard AI-Thinker Pinout)
@@ -212,10 +222,12 @@ static void routeToExternalUfl() {
 }
 
 static void selectAntenna(uint8_t ant) {
-  if (ant == 1) {
+  if (ant == ANTENNA_1_FRONT) {
+    // Route RF energy to Antenna 1 (Front Sector Patch)
     digitalWrite(AS179_V1_PIN, HIGH);
     digitalWrite(AS179_V2_PIN, LOW);
   } else {
+    // Route RF energy to Antenna 2 (Rear Sector Whip)
     digitalWrite(AS179_V1_PIN, LOW);
     digitalWrite(AS179_V2_PIN, HIGH);
   }
@@ -226,7 +238,8 @@ static void selectAntenna(uint8_t ant) {
 static void antennaInit() {
   pinMode(AS179_V1_PIN, OUTPUT);
   pinMode(AS179_V2_PIN, OUTPUT);
-  selectAntenna(1);
+  selectAntenna(ANTENNA_1_FRONT);
+  Serial.println("[rf] Dual-Antenna System initialized -> Default: Antenna 1 (Front Patch)");
 }
 
 // ============================================================================
@@ -251,11 +264,13 @@ static void evaluateAntennas() {
   uint8_t ch1 = meshChannel, ch2 = meshChannel;
   int8_t  r1  = -128,        r2  = -128;
 
-  selectAntenna(1);
+  // 1. Evaluate Antenna 1 (Front Patch Sector)
+  selectAntenna(ANTENNA_1_FRONT);
   bool f1 = scanForGateway(meshChannel, &ch1, &r1);
   if (!f1) f1 = scanForGateway(0, &ch1, &r1);
 
-  selectAntenna(2);
+  // 2. Evaluate Antenna 2 (Rear Whip/Omni Sector)
+  selectAntenna(ANTENNA_2_REAR);
   bool f2 = scanForGateway(meshChannel, &ch2, &r2);
   if (!f2) f2 = scanForGateway(0, &ch2, &r2);
 
@@ -263,22 +278,25 @@ static void evaluateAntennas() {
     rssiToGw = -128;
     selectAntenna(activeAntenna);
     esp_wifi_set_channel(meshChannel, WIFI_SECOND_CHAN_NONE);
-    Serial.printf("[ant] Gateway beacon unreachable on both, holding ant%u ch%u\n",
+    Serial.printf("[ant] Gateway beacon unreachable on both antennas, holding Antenna %u on Ch%u\n",
                   activeAntenna, meshChannel);
     return;
   }
 
+  // 3. Compare RSSI with 4 dB Hysteresis threshold
   uint8_t best = activeAntenna;
-  if (r1 >= r2 + ANT_HYSTERESIS_DB)      best = 1;
-  else if (r2 >= r1 + ANT_HYSTERESIS_DB) best = 2;
+  if (r1 >= r2 + ANT_HYSTERESIS_DB)      best = ANTENNA_1_FRONT;
+  else if (r2 >= r1 + ANT_HYSTERESIS_DB) best = ANTENNA_2_REAR;
 
   selectAntenna(best);
-  meshChannel = (best == 1) ? ch1 : ch2;
-  rssiToGw    = (best == 1) ? r1  : r2;
+  meshChannel = (best == ANTENNA_1_FRONT) ? ch1 : ch2;
+  rssiToGw    = (best == ANTENNA_1_FRONT) ? r1  : r2;
   esp_wifi_set_channel(meshChannel, WIFI_SECOND_CHAN_NONE);
 
-  Serial.printf("[ant] Dynamic Diversity: Ant1=%ddBm Ant2=%ddBm -> Active: Ant%u (Ch%u)\n",
-                r1, r2, activeAntenna, meshChannel);
+  Serial.printf("[ant] 2-Antenna Scan: Ant 1 (Front)=%d dBm | Ant 2 (Rear)=%d dBm -> Selected: Antenna %u (%s) on Ch%u\n",
+                r1, r2, activeAntenna,
+                (activeAntenna == ANTENNA_1_FRONT) ? "Front Sector Patch" : "Rear Sector Whip",
+                meshChannel);
 }
 
 // ============================================================================

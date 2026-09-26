@@ -143,7 +143,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </h2>
             </div>
             <span className="text-[10px] bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 font-bold px-2 py-0.5 border border-sky-300 dark:border-sky-800">
-              XIAO ESP32-C6 + AS179
+              ESP32-S + AS179
             </span>
           </div>
 

@@ -21,7 +21,7 @@ interface UmlBox {
 const INITIAL_UML_BOXES: UmlBox[] = [
   {
     id: 'xiao_c6',
-    stereotype: '«XIAO_ESP32C6»',
+    stereotype: '«ESP32-S»',
     title: 'Helmet Commando Node',
     x: 20,
     y: 20,
@@ -233,7 +233,7 @@ export const DataFlowDiagram: React.FC = () => {
         <div className="flex items-center gap-2">
           <GitFork className="w-4 h-4 text-tactical-cyan" />
           <span className="font-bold tracking-wider text-slate-900 dark:text-white text-[11.5px] uppercase">
-            INTERACTIVE MOVEABLE UML ARCHITECTURE // ESP32-C6 &amp; FIREBASE RTDB PIPELINE
+            INTERACTIVE MOVEABLE UML ARCHITECTURE // ESP32-S &amp; FIREBASE RTDB PIPELINE
           </span>
         </div>
         <div className="flex items-center gap-2">
