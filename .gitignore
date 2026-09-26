@@ -1,3 +1,3 @@
-# Generated telemetry tables. The simulator writes these under data/.
+# Tabular datasets
 *.csv
 *.tsv
