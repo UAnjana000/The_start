@@ -28,8 +28,14 @@ const char* WIFI_PASS = "83221436";
 #define XIAO_ANT_SEL_PIN   14   // HIGH: External u.FL port | LOW: On-board ceramic antenna
 
 // Dual-Antenna SPDT Switch (Skyworks AS179-92LF / PE4259)
-#define AS179_V1_PIN       22   // D4 (GPIO22) -> Control Line 1
-#define AS179_V2_PIN       23   // D5 (GPIO23) -> Control Line 2
+// On Seeed Studio XIAO ESP32-C6: Physical pad D4 is GPIO 22, Physical pad D5 is GPIO 23
+#if defined(D4) && defined(D5)
+  #define AS179_V1_PIN     D4   // Physical Pad D4 (GPIO 22) -> Control Line V1
+  #define AS179_V2_PIN     D5   // Physical Pad D5 (GPIO 23) -> Control Line V2
+#else
+  #define AS179_V1_PIN     22   // GPIO 22 (D4)
+  #define AS179_V2_PIN     23   // GPIO 23 (D5)
+#endif
 
 // Built-in User LED
 #define USER_LED_PIN       15
