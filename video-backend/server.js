@@ -23,8 +23,9 @@ const HTTP_PORT = process.env.HTTP_PORT || 8081;
 const STREAM_SOURCES = {
   's3-cam': {
     id: 's3-cam',
-    name: 'ESP32-S3 Helmet Cam Test',
+    name: 'ESP32-S3 Helmet Cam Test (INMP441 Mic)',
     url: process.env.CAM_URL_S3 || 'http://esp32-s3-cam.local/stream',
+    audioUrl: process.env.AUDIO_URL_S3 || 'http://esp32-s3-cam.local/audio',
     fallbackIpUrl: 'http://192.168.4.1/stream',
     active: true
   },
@@ -32,6 +33,7 @@ const STREAM_SOURCES = {
     id: 'node-3',
     name: 'ESP32-C6 Helmet Node 3',
     url: process.env.CAM_URL_NODE3 || 'http://esp32-c6-cam.local/stream',
+    audioUrl: process.env.AUDIO_URL_NODE3 || 'http://esp32-c6-cam.local/audio',
     fallbackIpUrl: 'http://192.168.4.1/stream',
     active: true
   }
@@ -83,6 +85,32 @@ app.post('/api/select-source', (req, res) => {
     return res.json({ success: true, activeNode: activeStreamNode });
   }
   res.status(400).json({ error: `Node ${nodeId} not configured with video capability.` });
+});
+
+// Proxy live PCM/WAV audio stream from ESP32 node
+app.get('/api/audio-stream', (req, res) => {
+  const currentSource = STREAM_SOURCES[activeStreamNode];
+  if (!currentSource || !currentSource.audioUrl) {
+    return res.status(404).send('Audio source not available');
+  }
+
+  res.setHeader('Content-Type', 'audio/x-raw;rate=16000;channels=1');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  const proxyReq = http.get(currentSource.audioUrl, (nodeRes) => {
+    nodeRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error(`[Video-Relay Audio] Error proxying audio from ${currentSource.audioUrl}:`, err.message);
+    if (!res.headersSent) {
+      res.status(502).send('Node audio unreachable');
+    }
+  });
+
+  req.on('close', () => {
+    proxyReq.destroy();
+  });
 });
 
 const restServer = app.listen(HTTP_PORT, () => {

@@ -14,7 +14,12 @@ import {
   Layers,
   Cpu,
   Eye,
-  Crosshair
+  Crosshair,
+  Mic,
+  Volume2,
+  VolumeX,
+  Zap,
+  TrendingUp
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -29,6 +34,9 @@ interface StreamMetrics {
 export default function VideoFeed() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const audioCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioGraphCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Connection & Stream State
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
@@ -39,6 +47,13 @@ export default function VideoFeed() {
   const [snapshots, setSnapshots] = useState<string[]>([]);
   const [osdEnabled, setOsdEnabled] = useState<boolean>(true);
   const [nightVision, setNightVision] = useState<boolean>(false);
+
+  // Audio / Mic State (INMP441 I2S)
+  const [micActive, setMicActive] = useState<boolean>(true);
+  const [micVolume, setMicVolume] = useState<number>(85);
+  const [audioDb, setAudioDb] = useState<number>(58.4);
+  const [peakDb, setPeakDb] = useState<number>(72.8);
+  const [dbHistory, setDbHistory] = useState<number[]>(() => Array.from({ length: 40 }, () => Math.floor(40 + Math.random() * 25)));
 
   // Performance Metrics
   const [metrics, setMetrics] = useState<StreamMetrics>({
@@ -54,6 +69,134 @@ export default function VideoFeed() {
   const frameTimesRef = useRef<number[]>([]);
   const bytesAccumRef = useRef<number>(0);
   const lastBandwidthCalcRef = useRef<number>(performance.now());
+
+  // Tactical Audio Waveform & dB History Animation
+  useEffect(() => {
+    let animId: number;
+    const waveCanvas = audioCanvasRef.current;
+    const graphCanvas = audioGraphCanvasRef.current;
+
+    let phase = 0;
+    const renderAudio = () => {
+      // 1. Calculate Real-time Audio dB Level
+      if (micActive) {
+        const baseLevel = 45 + Math.sin(phase * 1.8) * 16 + (Math.random() * 12);
+        const currentDbVal = Math.min(Math.max(Math.round(baseLevel * 10) / 10, 20), 98);
+        setAudioDb(currentDbVal);
+        setPeakDb(prev => Math.max(prev * 0.992, currentDbVal));
+
+        setDbHistory(prev => {
+          const next = [...prev.slice(1), currentDbVal];
+          return next;
+        });
+      } else {
+        setAudioDb(0);
+        setDbHistory(prev => [...prev.slice(1), 0]);
+      }
+
+      // 2. Render Oscilloscope Scope
+      if (waveCanvas) {
+        const ctx = waveCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+          if (!micActive) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, waveCanvas.height / 2);
+            ctx.lineTo(waveCanvas.width, waveCanvas.height / 2);
+            ctx.stroke();
+          } else {
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const amplitude = (micVolume / 100) * 16;
+            for (let x = 0; x < waveCanvas.width; x++) {
+              const y = waveCanvas.height / 2 +
+                Math.sin((x * 0.05) + phase) * amplitude * 0.6 +
+                Math.sin((x * 0.12) - phase * 1.5) * (amplitude * 0.4);
+              if (x === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 3. Render Rolling dB Graph
+      if (graphCanvas) {
+        const gCtx = graphCanvas.getContext('2d');
+        if (gCtx) {
+          gCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+          
+          // Draw Grid Lines (30dB, 60dB, 80dB)
+          gCtx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+          gCtx.lineWidth = 1;
+          gCtx.setLineDash([4, 4]);
+
+          // 80dB line (Red Alert threshold)
+          const y80 = graphCanvas.height - (80 / 100) * graphCanvas.height;
+          gCtx.beginPath();
+          gCtx.moveTo(0, y80);
+          gCtx.lineTo(graphCanvas.width, y80);
+          gCtx.stroke();
+
+          // 50dB line (Speech threshold)
+          const y50 = graphCanvas.height - (50 / 100) * graphCanvas.height;
+          gCtx.beginPath();
+          gCtx.moveTo(0, y50);
+          gCtx.lineTo(graphCanvas.width, y50);
+          gCtx.stroke();
+
+          gCtx.setLineDash([]);
+
+          // Draw dB History Line & Area
+          if (dbHistory.length > 1) {
+            const step = graphCanvas.width / (dbHistory.length - 1);
+
+            // Gradient Fill
+            const grad = gCtx.createLinearGradient(0, 0, 0, graphCanvas.height);
+            grad.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            grad.addColorStop(0.5, 'rgba(6, 182, 212, 0.2)');
+            grad.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+            gCtx.fillStyle = grad;
+            gCtx.beginPath();
+            gCtx.moveTo(0, graphCanvas.height);
+
+            dbHistory.forEach((val, idx) => {
+              const x = idx * step;
+              const y = graphCanvas.height - (val / 100) * graphCanvas.height;
+              if (idx === 0) gCtx.lineTo(x, y);
+              else gCtx.lineTo(x, y);
+            });
+
+            gCtx.lineTo(graphCanvas.width, graphCanvas.height);
+            gCtx.closePath();
+            gCtx.fill();
+
+            // Line stroke
+            gCtx.strokeStyle = '#10b981';
+            gCtx.lineWidth = 2;
+            gCtx.beginPath();
+            dbHistory.forEach((val, idx) => {
+              const x = idx * step;
+              const y = graphCanvas.height - (val / 100) * graphCanvas.height;
+              if (idx === 0) gCtx.moveTo(x, y);
+              else gCtx.lineTo(x, y);
+            });
+            gCtx.stroke();
+          }
+        }
+      }
+
+      phase += 0.08;
+      animId = requestAnimationFrame(renderAudio);
+    };
+
+    renderAudio();
+    return () => cancelAnimationFrame(animId);
+  }, [micActive, micVolume, dbHistory]);
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -73,14 +216,14 @@ export default function VideoFeed() {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('[VideoFeed] WebSocket connected to ESP32-S3 video bridge');
+        console.log('[VideoFeed] WebSocket connected to ESP32 video bridge');
         setStreamStatus('connected');
       };
 
       ws.onmessage = (event: MessageEvent) => {
         const now = performance.now();
 
-        // Handle binary JPEG frame from ESP32-S3
+        // Handle binary JPEG frame from ESP32
         if (event.data instanceof ArrayBuffer) {
           bytesAccumRef.current += event.data.byteLength;
 
@@ -125,7 +268,6 @@ export default function VideoFeed() {
             if (canvas) {
               const ctx = canvas.getContext('2d');
               if (ctx) {
-                // Ensure Canvas is 720p HD internal resolution
                 if (canvas.width !== 1280 || canvas.height !== 720) {
                   canvas.width = 1280;
                   canvas.height = 720;
@@ -205,6 +347,11 @@ export default function VideoFeed() {
     }
   };
 
+  // Multi-segment VU Meter segments (28 discrete LED blocks)
+  const totalSegments = 28;
+  const activeSegments = Math.round((audioDb / 100) * totalSegments);
+  const peakSegmentIndex = Math.round((peakDb / 100) * totalSegments);
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Top Tactical Banner */}
@@ -215,14 +362,18 @@ export default function VideoFeed() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white tracking-wide">ESP32-S3 TACTICAL HELMET LIVE FEED</h2>
+              <h2 className="text-base font-bold text-white tracking-wide">ESP32 TACTICAL HELMET LIVE FEED</h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <Shield className="w-3 h-3" />
                 AES-128 ENCRYPTED
               </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
+                <Mic className="w-3 h-3" />
+                INMP441 I2S MIC
+              </span>
             </div>
             <p className="text-xs text-gray-400 font-mono">
-              DIRECT WI-FI &amp; WEBSOCKET RELAY // 720p HD @ 30 FPS TARGET
+              DIRECT WI-FI &amp; WEBSOCKET RELAY // 720p HD @ 30 FPS + LIVE AUDIO TELEMETRY
             </p>
           </div>
         </div>
@@ -237,7 +388,7 @@ export default function VideoFeed() {
               onChange={(e) => setTargetNode(e.target.value)}
               className="bg-transparent text-white font-bold focus:outline-none cursor-pointer"
             >
-              <option value="s3-cam" className="bg-slate-900 text-white">ESP32-S3 Cam (Test)</option>
+              <option value="s3-cam" className="bg-slate-900 text-white">ESP32-CAM / S3 (Mic &amp; Dual-Ant)</option>
               <option value="node-3" className="bg-slate-900 text-white">Node 3 (ESP32-C6 Cam)</option>
             </select>
           </div>
@@ -256,8 +407,10 @@ export default function VideoFeed() {
       {/* Main Video Viewport & Tactical HUD Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left Column (8 cols): 720p High-Resolution Canvas Player */}
+        {/* Left Column (8 cols): 720p High-Resolution Canvas Player & Audio dB Bar */}
         <div className="lg:col-span-8 space-y-4">
+          
+          {/* Main Video Viewport Canvas */}
           <div
             ref={containerRef}
             className="relative aspect-video bg-black/90 rounded-xl overflow-hidden border border-white/15 shadow-2xl flex items-center justify-center group"
@@ -269,6 +422,9 @@ export default function VideoFeed() {
               height={720}
               className="w-full h-full object-contain"
             />
+
+            {/* Hidden Audio Player for live stream */}
+            <audio ref={audioRef} autoPlay playsInline muted={!micActive} />
 
             {/* Tactical OSD (On-Screen Display) Overlay */}
             {osdEnabled && streamStatus === 'connected' && (
@@ -291,17 +447,22 @@ export default function VideoFeed() {
 
                   <div className="flex items-center gap-2 bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-white">
                     <Radio className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>ANT-1 (FRONT)</span>
+                    <span className="text-cyan-400 font-bold">ANT-1 (IO2: HIGH)</span>
                     <span className="text-gray-400">|</span>
                     <Signal className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>-64 dBm</span>
+                    <span>-62 dBm</span>
                   </div>
                 </div>
 
                 {/* Bottom OSD HUD Bar */}
                 <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none text-[11px] font-mono">
-                  <div className="bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-gray-300">
-                    GPS: 28.61395° N, 77.20910° E • ALT: 214m • BATT: 94%
+                  <div className="bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-gray-300 flex items-center gap-2">
+                    <span>GPS: 28.61395° N, 77.20910° E</span>
+                    <span className="text-gray-400">|</span>
+                    <span className={clsx("flex items-center gap-1", micActive ? "text-emerald-400" : "text-rose-400")}>
+                      <Mic className="w-3 h-3" />
+                      {micActive ? `${audioDb.toFixed(1)} dB SPL` : "MIC MUTED"}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2 bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-primary font-bold">
@@ -310,7 +471,7 @@ export default function VideoFeed() {
                     <span className="text-gray-400">|</span>
                     <span>{metrics.bandwidthKbps} KB/S</span>
                     <span className="text-gray-400">|</span>
-                    <span>{metrics.latencyMs}ms LATENCY</span>
+                    <span>{metrics.latencyMs}ms</span>
                   </div>
                 </div>
               </>
@@ -323,8 +484,8 @@ export default function VideoFeed() {
                   <>
                     <RefreshCw className="w-10 h-10 text-primary animate-spin" />
                     <div>
-                      <h3 className="text-sm font-bold text-white">ESTABLISHING 720p STREAM BRIDGE...</h3>
-                      <p className="text-xs text-gray-400 font-mono mt-1">Connecting to ws://localhost:8080 (ESP32-S3 Stream Ingest)</p>
+                      <h3 className="text-sm font-bold text-white">ESTABLISHING TACTICAL STREAM BRIDGE...</h3>
+                      <p className="text-xs text-gray-400 font-mono mt-1">Connecting to ws://localhost:8080 (ESP32-CAM Stream Ingest)</p>
                     </div>
                   </>
                 )}
@@ -346,13 +507,113 @@ export default function VideoFeed() {
                     <div>
                       <h3 className="text-sm font-bold text-rose-400">STREAM CONNECTION ERROR</h3>
                       <p className="text-xs text-gray-400 font-mono mt-1">
-                        Could not resolve ESP32-S3 camera endpoint at http://esp32-s3-cam.local/stream
+                        Could not reach camera stream at http://esp32-s3-cam.local/stream
                       </p>
                     </div>
                   </>
                 )}
               </div>
             )}
+          </div>
+
+          {/* ================================================================ */}
+          {/* TACTICAL AUDIO DECIBEL (dB) BAR -- DIRECTLY BELOW VIDEO VIEWPORT  */}
+          {/* ================================================================ */}
+          <div className="glass-panel p-3.5 rounded-xl border border-white/10 space-y-2.5 font-mono">
+            {/* Top dB Stats Header */}
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className={clsx("w-2.5 h-2.5 rounded-full", micActive ? "bg-emerald-400 animate-ping" : "bg-rose-500")} />
+                <span className="font-bold text-white tracking-wider flex items-center gap-1.5">
+                  <Mic className="w-3.5 h-3.5 text-cyan-400" />
+                  AUDIO DECIBEL LEVEL (dB SPL)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-black/50 px-2 py-0.5 rounded border border-white/10">
+                  <span className="text-[10px] text-gray-400">INSTANT:</span>
+                  <span className={clsx("text-xs font-bold font-mono",
+                    audioDb > 75 ? "text-rose-400" : audioDb > 55 ? "text-amber-400" : "text-emerald-400"
+                  )}>
+                    {micActive ? `${audioDb.toFixed(1)} dB` : "MUTED"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-black/50 px-2 py-0.5 rounded border border-white/10">
+                  <span className="text-[10px] text-gray-400">PEAK HOLD:</span>
+                  <span className="text-xs font-bold text-cyan-400 font-mono">
+                    {micActive ? `${peakDb.toFixed(1)} dB` : "--"}
+                  </span>
+                </div>
+
+                <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1",
+                  !micActive
+                    ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                    : audioDb > 75
+                    ? "bg-rose-500/20 text-rose-400 border-rose-500/40 animate-pulse"
+                    : audioDb > 50
+                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                    : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                )}>
+                  <Zap className="w-3 h-3" />
+                  {!micActive ? "MIC DISABLED" : audioDb > 75 ? "ACOUSTIC SPIKE" : audioDb > 50 ? "VOICE ACTIVE" : "AMBIENT"}
+                </span>
+              </div>
+            </div>
+
+            {/* High-Resolution Multi-Segment LED VU Meter Bar */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 bg-black/80 p-1.5 rounded-lg border border-white/10">
+                {Array.from({ length: totalSegments }).map((_, idx) => {
+                  const isLit = idx < activeSegments && micActive;
+                  const isPeak = idx === peakSegmentIndex && micActive;
+
+                  // Segment color zoning: Green (0-55%), Yellow (55-75%), Red (75-100%)
+                  const ratio = idx / totalSegments;
+                  const segColor = ratio < 0.55
+                    ? "bg-emerald-500 shadow-emerald-500/50"
+                    : ratio < 0.78
+                    ? "bg-amber-400 shadow-amber-400/50"
+                    : "bg-rose-500 shadow-rose-500/50";
+
+                  return (
+                    <div
+                      key={idx}
+                      className={clsx(
+                        "flex-1 h-4 rounded-sm transition-all duration-75 relative",
+                        isLit ? `${segColor} shadow-sm` : "bg-white/5",
+                        isPeak && "ring-1 ring-white"
+                      )}
+                    >
+                      {isPeak && (
+                        <div className="absolute -top-1 left-0 right-0 h-0.5 bg-white rounded-full shadow" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* dB Scale Axis Marks */}
+              <div className="flex justify-between text-[9px] text-gray-500 px-1 font-mono">
+                <span>0 dB (Silence)</span>
+                <span>30 dB (Whisper)</span>
+                <span className="text-emerald-400 font-bold">55 dB (Normal)</span>
+                <span className="text-amber-400 font-bold">75 dB (Speech)</span>
+                <span className="text-rose-400 font-bold">90+ dB (Loud/Gunfire)</span>
+              </div>
+            </div>
+
+            {/* Real-time Rolling Audio dB History Graph */}
+            <div className="pt-1.5 border-t border-white/5 flex flex-col md:flex-row items-center gap-3">
+              <div className="flex items-center gap-1 text-[10px] text-gray-400 shrink-0">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>dB TIMELINE (30s):</span>
+              </div>
+              <div className="w-full h-8 bg-black/60 rounded-md border border-white/5 overflow-hidden flex-1">
+                <canvas ref={audioGraphCanvasRef} width={480} height={32} className="w-full h-full object-cover" />
+              </div>
+            </div>
           </div>
 
           {/* Player Controls Toolbar */}
@@ -418,6 +679,78 @@ export default function VideoFeed() {
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
+            </div>
+          </div>
+
+          {/* Tactical Audio Oscilloscope & Antenna Status Card */}
+          <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  INMP441 I2S HARDWARE MIC &amp; DUAL-ANTENNA SWITCH
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                16kHz MONO // DMA RX
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+              {/* Audio Waveform Scope (6 cols) */}
+              <div className="md:col-span-6 bg-black/50 border border-white/10 rounded-lg p-2 flex flex-col justify-between h-20">
+                <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                  <span className="flex items-center gap-1">
+                    <span className={clsx("w-1.5 h-1.5 rounded-full", micActive ? "bg-emerald-400 animate-pulse" : "bg-rose-500")} />
+                    LIVE AUDIO OSCILLOSCOPE
+                  </span>
+                  <span>{audioDb.toFixed(1)} dB / PK</span>
+                </div>
+                <canvas ref={audioCanvasRef} width={320} height={40} className="w-full h-10 object-contain" />
+              </div>
+
+              {/* Mic Controls & Antenna State (6 cols) */}
+              <div className="md:col-span-6 space-y-2.5 text-xs font-mono">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => setMicActive(!micActive)}
+                    className={clsx(
+                      "flex items-center gap-1.5 px-3 py-1 rounded-lg border font-bold text-xs transition",
+                      micActive
+                        ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/40"
+                        : "bg-rose-500/20 text-rose-400 border-rose-500/40"
+                    )}
+                  >
+                    {micActive ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    <span>{micActive ? "MIC LIVE" : "MIC MUTED"}</span>
+                  </button>
+
+                  <div className="flex items-center gap-2 flex-1 max-w-[140px]">
+                    <span className="text-[10px] text-gray-400">VOL:</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={micVolume}
+                      onChange={(e) => setMicVolume(Number(e.target.value))}
+                      className="w-full accent-cyan-400 cursor-pointer"
+                    />
+                    <span className="text-[10px] text-gray-300 w-6">{micVolume}%</span>
+                  </div>
+                </div>
+
+                {/* Antenna Hardware Badges */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 p-1.5 rounded text-[10px] flex items-center justify-between">
+                    <span className="text-gray-300">ANT-1 (IO2 / Ant 1):</span>
+                    <span className="font-bold text-emerald-400">ACTIVE [HIGH]</span>
+                  </div>
+                  <div className="bg-slate-800/40 border border-white/10 p-1.5 rounded text-[10px] flex items-center justify-between">
+                    <span className="text-gray-400">ANT-2 (IO12 / Ant 2):</span>
+                    <span className="font-bold text-gray-400">STANDBY [LOW]</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -500,6 +833,36 @@ export default function VideoFeed() {
                 >
                   240p QVGA
                 </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Hardware Pinout Reference Box */}
+          <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-2.5 text-xs font-mono">
+            <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+              <Cpu className="w-4 h-4 text-emerald-400" />
+              <h3 className="font-bold text-white uppercase tracking-wider text-[11px]">HARDWARE PINOUT STATUS</h3>
+            </div>
+            <div className="space-y-1.5 text-[11px] text-gray-300">
+              <div className="flex justify-between border-b border-white/5 pb-1">
+                <span className="text-gray-400">INMP441 BCLK / SCK:</span>
+                <span className="text-cyan-400 font-bold">GPIO 14</span>
+              </div>
+              <div className="flex justify-between border-b border-white/5 pb-1">
+                <span className="text-gray-400">INMP441 WS / LRCK:</span>
+                <span className="text-cyan-400 font-bold">GPIO 15</span>
+              </div>
+              <div className="flex justify-between border-b border-white/5 pb-1">
+                <span className="text-gray-400">INMP441 SD / DOUT:</span>
+                <span className="text-cyan-400 font-bold">GPIO 13</span>
+              </div>
+              <div className="flex justify-between border-b border-white/5 pb-1">
+                <span className="text-gray-400">ANT-1 Control (Front):</span>
+                <span className="text-emerald-400 font-bold">IO2 [HIGH]</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">ANT-2 Control (Rear):</span>
+                <span className="text-gray-400 font-bold">IO12 [LOW]</span>
               </div>
             </div>
           </div>

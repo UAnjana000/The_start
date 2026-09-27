@@ -1,8 +1,11 @@
 /*
- * s3_cam_test.ino / s3_cam_test.c -- ESP32 / ESP32-S3 Tactical Camera Streamer
+ * s3_cam_test.ino / s3_cam_test.c -- ESP32 Tactical Camera Streamer (AI-Thinker ESP32-CAM)
  * 
- * Based directly on the official ESP32 Arduino Core 3.3.11 CameraWebServer architecture.
- * Provides a clean, high-performance MJPEG stream at /stream on port 80.
+ * 100% Aligned with official ESP32 Arduino Core 3.3.11 CameraWebServer architecture:
+ * 1. Camera Sensor init runs FIRST with exact official parameters.
+ * 2. Antenna GPIOs (GPIO 2 = HIGH, GPIO 12 = LOW) configured safely post-camera init.
+ * 3. INMP441 I2S Microphone initialized on I2S_NUM_1 (GPIO 14, 15, 13).
+ * 4. Connects to Wi-Fi and streams MJPEG on /stream (Port 80) and PCM Audio on /audio (Port 80).
  */
 
 #include <Arduino.h>
@@ -10,107 +13,58 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include "esp_http_server.h"
+#include "driver/i2s.h"
 
 // ============================================================================
-// 1. SELECT CAMERA MODEL (Uncomment ONLY ONE matching your hardware)
+// 1. SELECT CAMERA MODEL
 // ============================================================================
-#define CAMERA_MODEL_AI_THINKER          // Standard ESP32-CAM (AI-Thinker OV2640)
-// #define CAMERA_MODEL_XIAO_ESP32S3     // Seeed Studio XIAO ESP32-S3 Sense
-// #define CAMERA_MODEL_ESP32S3_EYE      // ESP32-S3-EYE / Freenove ESP32-S3 CAM
-// #define CAMERA_MODEL_WROVER_KIT       // ESP-WROVER-KIT
+#define CAMERA_MODEL_AI_THINKER
 
 // ============================================================================
-// 2. WI-FI & MDNS CONFIGURATION
+// 2. WI-FI CREDENTIALS
 // ============================================================================
 const char* WIFI_SSID     = "ACT-ai_102711948432";
 const char* WIFI_PASS     = "83221436";
 const char* MDNS_HOSTNAME = "esp32-s3-cam";
 
 // ============================================================================
-// 3. CAMERA PIN DEFINITIONS (Exact mapping from official camera_pins.h)
+// 3. AI-THINKER ESP32-CAM OFFICIAL PIN DEFINITIONS
 // ============================================================================
-#if defined(CAMERA_MODEL_AI_THINKER)
-  #define PWDN_GPIO_NUM     32
-  #define RESET_GPIO_NUM    -1
-  #define XCLK_GPIO_NUM      0
-  #define SIOD_GPIO_NUM     26
-  #define SIOC_GPIO_NUM     27
+#define PWDN_GPIO_NUM     32
+#define RESET_GPIO_NUM    -1
+#define XCLK_GPIO_NUM      0
+#define SIOD_GPIO_NUM     26
+#define SIOC_GPIO_NUM     27
 
-  #define Y9_GPIO_NUM       35
-  #define Y8_GPIO_NUM       34
-  #define Y7_GPIO_NUM       39
-  #define Y6_GPIO_NUM       36
-  #define Y5_GPIO_NUM       21
-  #define Y4_GPIO_NUM       19
-  #define Y3_GPIO_NUM       18
-  #define Y2_GPIO_NUM        5
-  #define VSYNC_GPIO_NUM    25
-  #define HREF_GPIO_NUM     23
-  #define PCLK_GPIO_NUM     22
-  #define LED_GPIO_NUM       4
-
-#elif defined(CAMERA_MODEL_XIAO_ESP32S3)
-  #define PWDN_GPIO_NUM     -1
-  #define RESET_GPIO_NUM    -1
-  #define XCLK_GPIO_NUM     10
-  #define SIOD_GPIO_NUM     40
-  #define SIOC_GPIO_NUM     39
-
-  #define Y9_GPIO_NUM       48
-  #define Y8_GPIO_NUM       11
-  #define Y7_GPIO_NUM       12
-  #define Y6_GPIO_NUM       14
-  #define Y5_GPIO_NUM       16
-  #define Y4_GPIO_NUM       18
-  #define Y3_GPIO_NUM       17
-  #define Y2_GPIO_NUM       15
-  #define VSYNC_GPIO_NUM    38
-  #define HREF_GPIO_NUM     47
-  #define PCLK_GPIO_NUM     13
-
-#elif defined(CAMERA_MODEL_ESP32S3_EYE)
-  #define PWDN_GPIO_NUM     -1
-  #define RESET_GPIO_NUM    -1
-  #define XCLK_GPIO_NUM     15
-  #define SIOD_GPIO_NUM      4
-  #define SIOC_GPIO_NUM      5
-
-  #define Y9_GPIO_NUM       16
-  #define Y8_GPIO_NUM       17
-  #define Y7_GPIO_NUM       18
-  #define Y6_GPIO_NUM       12
-  #define Y5_GPIO_NUM       10
-  #define Y4_GPIO_NUM        8
-  #define Y3_GPIO_NUM        9
-  #define Y2_GPIO_NUM       11
-  #define VSYNC_GPIO_NUM     6
-  #define HREF_GPIO_NUM      7
-  #define PCLK_GPIO_NUM     13
-
-#elif defined(CAMERA_MODEL_WROVER_KIT)
-  #define PWDN_GPIO_NUM     -1
-  #define RESET_GPIO_NUM    -1
-  #define XCLK_GPIO_NUM     21
-  #define SIOD_GPIO_NUM     26
-  #define SIOC_GPIO_NUM     27
-
-  #define Y9_GPIO_NUM       35
-  #define Y8_GPIO_NUM       34
-  #define Y7_GPIO_NUM       39
-  #define Y6_GPIO_NUM       36
-  #define Y5_GPIO_NUM       19
-  #define Y4_GPIO_NUM       18
-  #define Y3_GPIO_NUM        5
-  #define Y2_GPIO_NUM        4
-  #define VSYNC_GPIO_NUM    25
-  #define HREF_GPIO_NUM     23
-  #define PCLK_GPIO_NUM     22
-#else
-  #error "Camera model not selected! Please uncomment a model in section 1."
-#endif
+#define Y9_GPIO_NUM       35
+#define Y8_GPIO_NUM       34
+#define Y7_GPIO_NUM       39
+#define Y6_GPIO_NUM       36
+#define Y5_GPIO_NUM       21
+#define Y4_GPIO_NUM       19
+#define Y3_GPIO_NUM       18
+#define Y2_GPIO_NUM        5
+#define VSYNC_GPIO_NUM    25
+#define HREF_GPIO_NUM     23
+#define PCLK_GPIO_NUM     22
 
 // ============================================================================
-// 4. HTTP MJPEG STREAM SERVER
+// 4. INMP441 I2S MICROPHONE PINS (Using I2S_NUM_1 to prevent camera conflict)
+// ============================================================================
+#define I2S_MIC_PORT        I2S_NUM_1
+#define I2S_MIC_BCLK_PIN    14    // Bit Clock (SCK)
+#define I2S_MIC_WS_PIN      15    // Word Select (WS/LRCK)
+#define I2S_MIC_DATA_IN_PIN 13    // Serial Data Out (SD)
+#define I2S_SAMPLE_RATE     16000 // 16kHz audio sample rate
+
+// ============================================================================
+// 5. ANTENNA & EXTRA GPIO PINS (Configured AFTER Camera Init)
+// ============================================================================
+#define PIN_ANT1_GPIO2      2     // Antenna 1 (Front): IO2 on header -> HIGH
+#define PIN_ANT2_GPIO12     12    // Antenna 2 (Rear):  IO12 on header -> LOW
+
+// ============================================================================
+// 6. HTTP SERVER & STREAM HANDLERS
 // ============================================================================
 httpd_handle_t stream_httpd = NULL;
 
@@ -127,7 +81,7 @@ static esp_err_t stream_handler(httpd_req_t *req) {
   while (true) {
     fb = esp_camera_fb_get();
     if (!fb) {
-      Serial.println("[cam] Error: Frame capture failed");
+      Serial.println("[cam] Frame capture failed");
       res = ESP_FAIL;
     } else {
       size_t hlen = snprintf(part_buf, sizeof(part_buf),
@@ -148,7 +102,34 @@ static esp_err_t stream_handler(httpd_req_t *req) {
   return res;
 }
 
-void startCameraServer() {
+static esp_err_t audio_handler(httpd_req_t *req) {
+  esp_err_t res = ESP_OK;
+  int32_t raw_buf[128];
+  int16_t pcm_buf[128];
+  size_t bytes_read = 0;
+
+  res = httpd_resp_set_type(req, "audio/x-raw");
+  if (res != ESP_OK) return res;
+
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
+  while (true) {
+    esp_err_t err = i2s_read(I2S_MIC_PORT, (char*)raw_buf, sizeof(raw_buf), &bytes_read, pdMS_TO_TICKS(100));
+    if (err == ESP_OK && bytes_read > 0) {
+      int samples = bytes_read / sizeof(int32_t);
+      for (int i = 0; i < samples; i++) {
+        pcm_buf[i] = (int16_t)(raw_buf[i] >> 14);
+      }
+      res = httpd_resp_send_chunk(req, (const char*)pcm_buf, samples * sizeof(int16_t));
+      if (res != ESP_OK) break;
+    } else {
+      delay(10);
+    }
+  }
+  return res;
+}
+
+void startHttpServers() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = 80;
   config.ctrl_port = 32768;
@@ -160,28 +141,67 @@ void startCameraServer() {
     .user_ctx  = NULL
   };
 
+  httpd_uri_t audio_uri = {
+    .uri       = "/audio",
+    .method    = HTTP_GET,
+    .handler   = audio_handler,
+    .user_ctx  = NULL
+  };
+
   if (httpd_start(&stream_httpd, &config) == ESP_OK) {
     httpd_register_uri_handler(stream_httpd, &stream_uri);
-    Serial.println("[http] MJPEG Stream server listening on port 80: /stream");
-  } else {
-    Serial.println("[http] Failed to start HTTP stream server!");
+    httpd_register_uri_handler(stream_httpd, &audio_uri);
+    Serial.println("[http] MJPEG Stream listening on :80/stream");
+    Serial.println("[http] PCM Audio Stream listening on :80/audio");
   }
 }
 
 // ============================================================================
-// 5. SETUP & INITIALIZATION (Official Core 3.3.11 Architecture)
+// 7. INMP441 I2S MICROPHONE INIT (I2S_NUM_1)
+// ============================================================================
+static void initI2SMic() {
+  i2s_config_t i2s_config = {
+    .mode                 = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
+    .sample_rate          = I2S_SAMPLE_RATE,
+    .bits_per_sample      = I2S_BITS_PER_SAMPLE_32BIT,
+    .channel_format       = I2S_CHANNEL_FMT_ONLY_LEFT,
+    .communication_format = i2s_comm_format_t(I2S_COMM_FORMAT_STAND_I2S),
+    .intr_alloc_flags     = ESP_INTR_FLAG_LEVEL1,
+    .dma_buf_count        = 4,
+    .dma_buf_len          = 256,
+    .use_apll             = false,
+    .tx_desc_auto_clear   = false,
+    .fixed_mclk           = 0
+  };
+
+  i2s_pin_config_t pin_config = {
+    .bck_io_num   = I2S_MIC_BCLK_PIN,
+    .ws_io_num    = I2S_MIC_WS_PIN,
+    .data_out_num = I2S_PIN_NO_CHANGE,
+    .data_in_num  = I2S_MIC_DATA_IN_PIN
+  };
+
+  if (i2s_driver_install(I2S_MIC_PORT, &i2s_config, 0, NULL) == ESP_OK) {
+    i2s_set_pin(I2S_MIC_PORT, &pin_config);
+    Serial.println("[mic] INMP441 I2S Microphone ready (GPIO 14, 15, 13)");
+  } else {
+    Serial.println("[mic] I2S install failed");
+  }
+}
+
+// ============================================================================
+// 8. SETUP -- CAMERA INIT FIRST (Official Architecture)
 // ============================================================================
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
-  delay(1000);
-  Serial.println("\n==========================================");
-  Serial.println("  ESP32 Tactical Camera Stream Server     ");
+  Serial.println();
+  Serial.println("==========================================");
+  Serial.println("   AI-Thinker ESP32-CAM Streamer Test     ");
   Serial.println("==========================================");
 
+  // 1. Configure Camera Parameters (EXACT Official Settings)
   camera_config_t config;
-  memset(&config, 0, sizeof(camera_config_t));
-
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer   = LEDC_TIMER_0;
   config.pin_d0       = Y2_GPIO_NUM;
@@ -208,28 +228,24 @@ void setup() {
   config.jpeg_quality = 12;
   config.fb_count     = 1;
 
-  // PSRAM optimization
   if (psramFound()) {
-    Serial.println("[psram] PSRAM available: Allocating double framebuffers");
     config.jpeg_quality = 10;
     config.fb_count     = 2;
     config.grab_mode    = CAMERA_GRAB_LATEST;
   } else {
-    Serial.println("[psram] No PSRAM: Falling back to SVGA in internal DRAM");
     config.frame_size   = FRAMESIZE_SVGA;
     config.fb_location  = CAMERA_FB_IN_DRAM;
   }
 
-  // Camera Sensor Initialization
+  // 2. Camera Sensor Initialization (Runs FIRST before any GPIO interference)
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("[cam] Camera init failed with error: 0x%x\n", err);
+    Serial.printf("[cam] Camera init failed with error 0x%x\n", err);
     return;
   }
 
   sensor_t *s = esp_camera_sensor_get();
   if (s != NULL) {
-    // Drop resolution to VGA for high frame rate tactical video
     s->set_framesize(s, FRAMESIZE_VGA);
     if (s->id.PID == OV3660_PID) {
       s->set_vflip(s, 1);
@@ -239,7 +255,19 @@ void setup() {
   }
   Serial.println("[cam] Camera Sensor initialized successfully!");
 
-  // Connect to Wi-Fi with sleep disabled for optimal stream latency
+  // 3. Configure Antenna GPIOs (Safe AFTER camera sensor has claimed its pins)
+  pinMode(PIN_ANT1_GPIO2, OUTPUT);
+  digitalWrite(PIN_ANT1_GPIO2, HIGH);
+  Serial.println("[gpio] Antenna 1 (GPIO 2 / IO2) -> LOCKED HIGH (3.3V)");
+
+  pinMode(PIN_ANT2_GPIO12, OUTPUT);
+  digitalWrite(PIN_ANT2_GPIO12, LOW);
+  Serial.println("[gpio] Antenna 2 (GPIO 12 / IO12) -> LOCKED LOW  (0.0V)");
+
+  // 4. Initialize INMP441 Microphone (I2S_NUM_1)
+  initI2SMic();
+
+  // 5. Connect to Wi-Fi
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   WiFi.setSleep(false);
@@ -256,25 +284,27 @@ void setup() {
     Serial.println("\n[wifi] WiFi connected!");
     Serial.print("[wifi] IP Address: http://");
     Serial.println(WiFi.localIP());
-    Serial.print("[wifi] Stream URL: http://");
+    Serial.print("[wifi] Video Stream: http://");
     Serial.print(WiFi.localIP());
     Serial.println("/stream");
 
     if (MDNS.begin(MDNS_HOSTNAME)) {
       MDNS.addService("http", "tcp", 80);
-      Serial.printf("[mdns] Stream discoverable at: http://%s.local/stream\n", MDNS_HOSTNAME);
+      Serial.printf("[mdns] Stream URL: http://%s.local/stream\n", MDNS_HOSTNAME);
     }
 
-    startCameraServer();
-    Serial.println("\n[ready] Camera Server Ready! Open the Video Feed tab in the dashboard.");
+    startHttpServers();
+    Serial.println("\n[ready] Camera and Mic Ready! Streaming live to dashboard.");
   } else {
-    Serial.println("\n[wifi] Wi-Fi connection failed! Check SSID & password.");
+    Serial.println("\n[wifi] Wi-Fi connection failed!");
   }
 }
 
 // ============================================================================
-// 6. MAIN LOOP
+// 9. LOOP
 // ============================================================================
 void loop() {
+  digitalWrite(PIN_ANT1_GPIO2, HIGH);
+  digitalWrite(PIN_ANT2_GPIO12, LOW);
   delay(10000);
 }
