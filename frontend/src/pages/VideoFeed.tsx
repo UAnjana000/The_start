@@ -32,7 +32,6 @@ interface StreamMetrics {
 export default function VideoFeed() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const audioGraphCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Web Audio API References for Browser Speaker Output
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -53,7 +52,6 @@ export default function VideoFeed() {
   // Audio / Speaker Playback State (INMP441 I2S)
   const [speakerEnabled, setSpeakerEnabled] = useState<boolean>(false);
   const [audioDb, setAudioDb] = useState<number>(58.4);
-  const [dbHistory, setDbHistory] = useState<number[]>(() => Array.from({ length: 40 }, () => Math.floor(40 + Math.random() * 25)));
 
   // Performance Metrics
   const [metrics, setMetrics] = useState<StreamMetrics>({
@@ -174,93 +172,25 @@ export default function VideoFeed() {
     }
   };
 
-  // Tactical Audio dB History Animation
+  // Real-time Audio dB Level Update Loop
   useEffect(() => {
     let animId: number;
-    const graphCanvas = audioGraphCanvasRef.current;
-
     let phase = 0;
-    const renderAudio = () => {
-      // 1. Calculate Real-time Audio dB Level
+
+    const updateAudio = () => {
       const baseLevel = 48 + Math.sin(phase * 1.8) * 16 + (Math.random() * 10);
       const currentDbVal = Math.min(Math.max(Math.round(baseLevel * 10) / 10, 20), 98);
       
       setAudioDb(prev => (prev === 58.4 || prev < 10) ? currentDbVal : prev);
 
-      setDbHistory(prev => {
-        const next = [...prev.slice(1), currentDbVal];
-        return next;
-      });
-
-      // 2. Render Rolling dB Graph
-      if (graphCanvas) {
-        const gCtx = graphCanvas.getContext('2d');
-        if (gCtx) {
-          gCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
-          
-          // Draw Grid Lines (50dB, 80dB)
-          gCtx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
-          gCtx.lineWidth = 1;
-          gCtx.setLineDash([4, 4]);
-
-          const y80 = graphCanvas.height - (80 / 100) * graphCanvas.height;
-          gCtx.beginPath();
-          gCtx.moveTo(0, y80);
-          gCtx.lineTo(graphCanvas.width, y80);
-          gCtx.stroke();
-
-          const y50 = graphCanvas.height - (50 / 100) * graphCanvas.height;
-          gCtx.beginPath();
-          gCtx.moveTo(0, y50);
-          gCtx.lineTo(graphCanvas.width, y50);
-          gCtx.stroke();
-
-          gCtx.setLineDash([]);
-
-          // Draw dB History Line & Area
-          if (dbHistory.length > 1) {
-            const step = graphCanvas.width / (dbHistory.length - 1);
-
-            const grad = gCtx.createLinearGradient(0, 0, 0, graphCanvas.height);
-            grad.addColorStop(0, speakerEnabled ? 'rgba(16, 185, 129, 0.35)' : 'rgba(6, 182, 212, 0.25)');
-            grad.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
-
-            gCtx.fillStyle = grad;
-            gCtx.beginPath();
-            gCtx.moveTo(0, graphCanvas.height);
-
-            dbHistory.forEach((val, idx) => {
-              const x = idx * step;
-              const y = graphCanvas.height - (val / 100) * graphCanvas.height;
-              if (idx === 0) gCtx.lineTo(x, y);
-              else gCtx.lineTo(x, y);
-            });
-
-            gCtx.lineTo(graphCanvas.width, graphCanvas.height);
-            gCtx.closePath();
-            gCtx.fill();
-
-            gCtx.strokeStyle = speakerEnabled ? '#10b981' : '#06b6d4';
-            gCtx.lineWidth = 2;
-            gCtx.beginPath();
-            dbHistory.forEach((val, idx) => {
-              const x = idx * step;
-              const y = graphCanvas.height - (val / 100) * graphCanvas.height;
-              if (idx === 0) gCtx.moveTo(x, y);
-              else gCtx.lineTo(x, y);
-            });
-            gCtx.stroke();
-          }
-        }
-      }
-
       phase += 0.05;
-      animId = requestAnimationFrame(renderAudio);
+      animId = requestAnimationFrame(updateAudio);
     };
 
-    animId = requestAnimationFrame(renderAudio);
+    animId = requestAnimationFrame(updateAudio);
     return () => cancelAnimationFrame(animId);
-  }, [speakerEnabled, dbHistory]);
+  }, []);
+
 
 
   const connectWebSocket = useCallback(() => {
@@ -577,20 +507,20 @@ export default function VideoFeed() {
           </div>
 
           {/* ================================================================ */}
-          {/* MINIMAL AUDIO WIDGET -- MUTE/UNMUTE & REALTIME dB GRAPH          */}
+          {/* MINIMAL AUDIO BAR -- MUTE/UNMUTE & HORIZONTAL RED-YELLOW-GREEN dB BAR */}
           {/* ================================================================ */}
-          <div className="glass-panel p-2.5 px-3.5 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
-            {/* Left: Mute / Unmute Button */}
-            <div className="flex items-center gap-2">
+          <div className="glass-panel p-2.5 px-4 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
+            {/* Left: Mute / Unmute Button & Status */}
+            <div className="flex items-center gap-2.5 shrink-0">
               <button
                 onClick={toggleSpeaker}
                 className={clsx(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg border font-bold text-xs transition duration-150 shadow-sm",
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg border font-bold text-xs transition duration-150 shadow-sm cursor-pointer",
                   speakerEnabled
                     ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30"
                     : "bg-white/5 text-gray-400 border-white/10 hover:text-white hover:bg-white/10"
                 )}
-                title={speakerEnabled ? "Mute Speaker Audio" : "Unmute Speaker Audio"}
+                title={speakerEnabled ? "Mute Audio" : "Unmute Audio"}
               >
                 {speakerEnabled ? <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" /> : <VolumeX className="w-4 h-4 text-gray-400" />}
                 <span>{speakerEnabled ? "MUTE" : "UNMUTE"}</span>
@@ -604,17 +534,45 @@ export default function VideoFeed() {
               </div>
             </div>
 
-            {/* Center: Live Rolling dB Timeline Graph */}
-            <div className="flex-1 min-w-[180px] h-8 bg-black/60 rounded-lg border border-white/10 overflow-hidden relative flex items-center px-2">
-              <canvas ref={audioGraphCanvasRef} width={400} height={32} className="w-full h-full object-cover" />
+            {/* Center: Horizontal Multi-Color (Green -> Yellow -> Red) dB Meter Bar */}
+            <div className="flex-1 min-w-[200px] flex flex-col justify-center gap-1">
+              {/* Colored Meter Track */}
+              <div className="w-full h-3.5 bg-black/60 rounded-full border border-white/10 p-0.5 relative overflow-hidden flex items-center">
+                {/* Background colored zone guides */}
+                <div className="absolute inset-0 flex opacity-15 pointer-events-none rounded-full overflow-hidden">
+                  <div className="w-[55%] bg-emerald-500" />
+                  <div className="w-[20%] bg-amber-400" />
+                  <div className="w-[25%] bg-rose-500" />
+                </div>
+
+                {/* Dynamic Active Level Bar with Green-Yellow-Red Gradient */}
+                <div
+                  className={clsx(
+                    "h-full rounded-full transition-all duration-75 relative",
+                    audioDb > 75
+                      ? "bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 shadow-rose-500/50 shadow-sm"
+                      : audioDb > 55
+                      ? "bg-gradient-to-r from-emerald-500 to-amber-400 shadow-amber-400/50 shadow-sm"
+                      : "bg-emerald-500 shadow-emerald-500/50 shadow-sm"
+                  )}
+                  style={{ width: `${Math.min(Math.max((audioDb / 100) * 100, 4), 100)}%` }}
+                />
+              </div>
+
+              {/* Range Labels: Green / Yellow / Red Zones */}
+              <div className="flex justify-between text-[9px] px-1 font-mono text-gray-400">
+                <span className="text-emerald-400 font-semibold">SAFE (0-55 dB)</span>
+                <span className="text-amber-400 font-semibold">VOICE (55-75 dB)</span>
+                <span className="text-rose-400 font-semibold">LOUD (75-100 dB)</span>
+              </div>
             </div>
 
-            {/* Right: Instant dB Level */}
-            <div className="flex items-center gap-2">
+            {/* Right: Real-time dB Value Badge */}
+            <div className="flex items-center gap-2 shrink-0">
               <div className="flex items-center gap-1.5 bg-black/50 px-2.5 py-1 rounded-lg border border-white/10">
                 <span className="text-[10px] text-gray-400">dB:</span>
                 <span className={clsx("font-bold text-xs font-mono",
-                  audioDb > 75 ? "text-rose-400" : audioDb > 55 ? "text-amber-400" : "text-emerald-400"
+                  audioDb > 75 ? "text-rose-400 font-extrabold animate-pulse" : audioDb > 55 ? "text-amber-400" : "text-emerald-400"
                 )}>
                   {audioDb.toFixed(1)} dB
                 </span>
