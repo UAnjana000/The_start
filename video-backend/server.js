@@ -25,7 +25,7 @@ const STREAM_SOURCES = {
     id: 's3-cam',
     name: 'ESP32-S3 Helmet Cam Test (INMP441 Mic)',
     url: process.env.CAM_URL_S3 || 'http://esp32-s3-cam.local/stream',
-    audioUrl: process.env.AUDIO_URL_S3 || 'http://esp32-s3-cam.local/audio',
+    audioUrl: process.env.AUDIO_URL_S3 || 'http://esp32-s3-cam.local:81/audio',
     fallbackIpUrl: 'http://192.168.4.1/stream',
     active: true
   },
@@ -33,7 +33,7 @@ const STREAM_SOURCES = {
     id: 'node-3',
     name: 'ESP32-C6 Helmet Node 3',
     url: process.env.CAM_URL_NODE3 || 'http://esp32-c6-cam.local/stream',
-    audioUrl: process.env.AUDIO_URL_NODE3 || 'http://esp32-c6-cam.local/audio',
+    audioUrl: process.env.AUDIO_URL_NODE3 || 'http://esp32-c6-cam.local:81/audio',
     fallbackIpUrl: 'http://192.168.4.1/stream',
     active: true
   }

@@ -1,11 +1,14 @@
 /*
- * s3_cam_test.ino / s3_cam_test.c -- ESP32 Tactical Camera Streamer (AI-Thinker ESP32-CAM)
+ * s3_cam_test.ino / s3_cam_test.c -- ESP32 Tactical Camera & I2S Audio Streamer
  * 
- * 100% Aligned with official ESP32 Arduino Core 3.3.11 CameraWebServer architecture:
- * 1. Camera Sensor init runs FIRST with exact official parameters.
- * 2. Antenna GPIOs (GPIO 2 = HIGH, GPIO 12 = LOW) configured safely post-camera init.
- * 3. INMP441 I2S Microphone initialized on I2S_NUM_1 (GPIO 14, 15, 13).
- * 4. Connects to Wi-Fi and streams MJPEG on /stream (Port 80) and PCM Audio on /audio (Port 80).
+ * Target Hardware: AI-Thinker ESP32-CAM (OV2640)
+ * 
+ * Architecture:
+ * - Port 80: Dedicated MJPEG Video HTTP Server (/stream)
+ * - Port 81: Dedicated I2S PCM Audio HTTP Server (/audio)
+ * - I2S_NUM_1 DMA: INMP441 Microphone (GPIO 14=BCLK, 15=WS, 13=SD)
+ * - Antenna 1: GPIO 2  (IO2 on header)  -> Locked HIGH
+ * - Antenna 2: GPIO 12 (IO12 on header) -> Locked LOW
  */
 
 #include <Arduino.h>
@@ -54,20 +57,22 @@ const char* MDNS_HOSTNAME = "esp32-s3-cam";
 #define I2S_MIC_PORT        I2S_NUM_1
 #define I2S_MIC_BCLK_PIN    14    // Bit Clock (SCK)
 #define I2S_MIC_WS_PIN      15    // Word Select (WS/LRCK)
-#define I2S_MIC_DATA_IN_PIN 13    // Serial Data Out (SD)
+#define I2S_MIC_DATA_IN_PIN 13    // Serial Data Out from Mic (SD)
 #define I2S_SAMPLE_RATE     16000 // 16kHz audio sample rate
 
 // ============================================================================
-// 5. ANTENNA & EXTRA GPIO PINS (Configured AFTER Camera Init)
+// 5. ANTENNA & EXTRA GPIO PINS
 // ============================================================================
 #define PIN_ANT1_GPIO2      2     // Antenna 1 (Front): IO2 on header -> HIGH
 #define PIN_ANT2_GPIO12     12    // Antenna 2 (Rear):  IO12 on header -> LOW
 
 // ============================================================================
-// 6. HTTP SERVER & STREAM HANDLERS
+// 6. DEDICATED HTTP SERVERS (Port 80 for Video, Port 81 for Audio)
 // ============================================================================
-httpd_handle_t stream_httpd = NULL;
+httpd_handle_t video_httpd = NULL;
+httpd_handle_t audio_httpd = NULL;
 
+// Port 80: High-FPS MJPEG Video Stream
 static esp_err_t stream_handler(httpd_req_t *req) {
   camera_fb_t * fb = NULL;
   esp_err_t res = ESP_OK;
@@ -102,37 +107,41 @@ static esp_err_t stream_handler(httpd_req_t *req) {
   return res;
 }
 
+// Port 81: Live 16kHz PCM Audio Stream from INMP441 Microphone
 static esp_err_t audio_handler(httpd_req_t *req) {
   esp_err_t res = ESP_OK;
-  int32_t raw_buf[128];
-  int16_t pcm_buf[128];
+  int32_t raw_buf[256];
+  int16_t pcm_buf[256];
   size_t bytes_read = 0;
 
-  res = httpd_resp_set_type(req, "audio/x-raw");
+  res = httpd_resp_set_type(req, "audio/x-raw;rate=16000;channels=1");
   if (res != ESP_OK) return res;
 
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
 
   while (true) {
     esp_err_t err = i2s_read(I2S_MIC_PORT, (char*)raw_buf, sizeof(raw_buf), &bytes_read, pdMS_TO_TICKS(100));
     if (err == ESP_OK && bytes_read > 0) {
       int samples = bytes_read / sizeof(int32_t);
       for (int i = 0; i < samples; i++) {
+        // INMP441 outputs 24-bit MSB-aligned data; shift right 14 bits to scale to 16-bit PCM
         pcm_buf[i] = (int16_t)(raw_buf[i] >> 14);
       }
       res = httpd_resp_send_chunk(req, (const char*)pcm_buf, samples * sizeof(int16_t));
       if (res != ESP_OK) break;
     } else {
-      delay(10);
+      delay(5);
     }
   }
   return res;
 }
 
 void startHttpServers() {
-  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.server_port = 80;
-  config.ctrl_port = 32768;
+  // 1. Start Dedicated Video Server on Port 80
+  httpd_config_t v_config = HTTPD_DEFAULT_CONFIG();
+  v_config.server_port = 80;
+  v_config.ctrl_port = 32768;
 
   httpd_uri_t stream_uri = {
     .uri       = "/stream",
@@ -141,6 +150,16 @@ void startHttpServers() {
     .user_ctx  = NULL
   };
 
+  if (httpd_start(&video_httpd, &v_config) == ESP_OK) {
+    httpd_register_uri_handler(video_httpd, &stream_uri);
+    Serial.println("[http] Video Server active on :80/stream");
+  }
+
+  // 2. Start Dedicated Audio Server on Port 81 (Completely independent task)
+  httpd_config_t a_config = HTTPD_DEFAULT_CONFIG();
+  a_config.server_port = 81;
+  a_config.ctrl_port = 32769;
+
   httpd_uri_t audio_uri = {
     .uri       = "/audio",
     .method    = HTTP_GET,
@@ -148,11 +167,9 @@ void startHttpServers() {
     .user_ctx  = NULL
   };
 
-  if (httpd_start(&stream_httpd, &config) == ESP_OK) {
-    httpd_register_uri_handler(stream_httpd, &stream_uri);
-    httpd_register_uri_handler(stream_httpd, &audio_uri);
-    Serial.println("[http] MJPEG Stream listening on :80/stream");
-    Serial.println("[http] PCM Audio Stream listening on :80/audio");
+  if (httpd_start(&audio_httpd, &a_config) == ESP_OK) {
+    httpd_register_uri_handler(audio_httpd, &audio_uri);
+    Serial.println("[http] Audio Server active on :81/audio");
   }
 }
 
@@ -200,7 +217,7 @@ void setup() {
   Serial.println("   AI-Thinker ESP32-CAM Streamer Test     ");
   Serial.println("==========================================");
 
-  // 1. Configure Camera Parameters (EXACT Official Settings)
+  // 1. Configure Camera Parameters
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer   = LEDC_TIMER_0;
@@ -237,7 +254,7 @@ void setup() {
     config.fb_location  = CAMERA_FB_IN_DRAM;
   }
 
-  // 2. Camera Sensor Initialization (Runs FIRST before any GPIO interference)
+  // 2. Camera Sensor Initialization
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("[cam] Camera init failed with error 0x%x\n", err);
@@ -255,7 +272,7 @@ void setup() {
   }
   Serial.println("[cam] Camera Sensor initialized successfully!");
 
-  // 3. Configure Antenna GPIOs (Safe AFTER camera sensor has claimed its pins)
+  // 3. Configure Antenna GPIOs
   pinMode(PIN_ANT1_GPIO2, OUTPUT);
   digitalWrite(PIN_ANT1_GPIO2, HIGH);
   Serial.println("[gpio] Antenna 1 (GPIO 2 / IO2) -> LOCKED HIGH (3.3V)");
@@ -286,11 +303,16 @@ void setup() {
     Serial.println(WiFi.localIP());
     Serial.print("[wifi] Video Stream: http://");
     Serial.print(WiFi.localIP());
-    Serial.println("/stream");
+    Serial.println(":80/stream");
+    Serial.print("[wifi] Audio Stream: http://");
+    Serial.print(WiFi.localIP());
+    Serial.println(":81/audio");
 
     if (MDNS.begin(MDNS_HOSTNAME)) {
       MDNS.addService("http", "tcp", 80);
-      Serial.printf("[mdns] Stream URL: http://%s.local/stream\n", MDNS_HOSTNAME);
+      MDNS.addService("http", "tcp", 81);
+      Serial.printf("[mdns] Stream URL: http://%s.local:80/stream\n", MDNS_HOSTNAME);
+      Serial.printf("[mdns] Audio URL:  http://%s.local:81/audio\n", MDNS_HOSTNAME);
     }
 
     startHttpServers();
