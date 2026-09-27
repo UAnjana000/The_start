@@ -17,10 +17,7 @@ import {
   Crosshair,
   Mic,
   Volume2,
-  VolumeX,
-  Zap,
-  TrendingUp,
-  Headphones
+  VolumeX
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -35,7 +32,6 @@ interface StreamMetrics {
 export default function VideoFeed() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const audioCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioGraphCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Web Audio API References for Browser Speaker Output
@@ -55,11 +51,8 @@ export default function VideoFeed() {
   const [nightVision, setNightVision] = useState<boolean>(false);
 
   // Audio / Speaker Playback State (INMP441 I2S)
-  const [micActive, setMicActive] = useState<boolean>(true);
   const [speakerEnabled, setSpeakerEnabled] = useState<boolean>(false);
-  const [micVolume, setMicVolume] = useState<number>(85);
   const [audioDb, setAudioDb] = useState<number>(58.4);
-  const [peakDb, setPeakDb] = useState<number>(72.8);
   const [dbHistory, setDbHistory] = useState<number[]>(() => Array.from({ length: 40 }, () => Math.floor(40 + Math.random() * 25)));
 
   // Performance Metrics
@@ -86,7 +79,7 @@ export default function VideoFeed() {
         const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         const ctx = new AudioCtx({ sampleRate: 16000 });
         const gain = ctx.createGain();
-        gain.gain.value = micVolume / 100;
+        gain.gain.value = 0.85;
         gain.connect(ctx.destination);
 
         audioCtxRef.current = ctx;
@@ -181,72 +174,25 @@ export default function VideoFeed() {
     }
   };
 
-  // Adjust volume on the live Web Audio Gain Node
-  useEffect(() => {
-    if (gainNodeRef.current && audioCtxRef.current) {
-      gainNodeRef.current.gain.setValueAtTime(
-        micActive ? micVolume / 100 : 0,
-        audioCtxRef.current.currentTime
-      );
-    }
-  }, [micVolume, micActive]);
-
-  // Tactical Audio Waveform & dB History Animation
+  // Tactical Audio dB History Animation
   useEffect(() => {
     let animId: number;
-    const waveCanvas = audioCanvasRef.current;
     const graphCanvas = audioGraphCanvasRef.current;
 
     let phase = 0;
     const renderAudio = () => {
       // 1. Calculate Real-time Audio dB Level
-      if (micActive) {
-        const baseLevel = 48 + Math.sin(phase * 1.8) * 16 + (Math.random() * 10);
-        const currentDbVal = Math.min(Math.max(Math.round(baseLevel * 10) / 10, 20), 98);
-        
-        // If not receiving live stream from mic, generate live simulated noise level
-        setAudioDb(prev => (prev === 58.4 || prev < 10) ? currentDbVal : prev);
-        setPeakDb(prev => Math.max(prev * 0.992, currentDbVal));
+      const baseLevel = 48 + Math.sin(phase * 1.8) * 16 + (Math.random() * 10);
+      const currentDbVal = Math.min(Math.max(Math.round(baseLevel * 10) / 10, 20), 98);
+      
+      setAudioDb(prev => (prev === 58.4 || prev < 10) ? currentDbVal : prev);
 
-        setDbHistory(prev => {
-          const next = [...prev.slice(1), currentDbVal];
-          return next;
-        });
-      } else {
-        setAudioDb(0);
-        setDbHistory(prev => [...prev.slice(1), 0]);
-      }
+      setDbHistory(prev => {
+        const next = [...prev.slice(1), currentDbVal];
+        return next;
+      });
 
-      // 2. Render Oscilloscope Scope
-      if (waveCanvas) {
-        const ctx = waveCanvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
-          if (!micActive) {
-            ctx.strokeStyle = '#ef4444';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(0, waveCanvas.height / 2);
-            ctx.lineTo(waveCanvas.width, waveCanvas.height / 2);
-            ctx.stroke();
-          } else {
-            ctx.strokeStyle = speakerEnabled ? '#10b981' : '#06b6d4';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            const amplitude = (micVolume / 100) * 16;
-            for (let x = 0; x < waveCanvas.width; x++) {
-              const y = waveCanvas.height / 2 +
-                Math.sin((x * 0.05) + phase) * amplitude * 0.6 +
-                Math.sin((x * 0.12) - phase * 1.5) * (amplitude * 0.4);
-              if (x === 0) ctx.moveTo(x, y);
-              else ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-          }
-        }
-      }
-
-      // 3. Render Rolling dB Graph
+      // 2. Render Rolling dB Graph
       if (graphCanvas) {
         const gCtx = graphCanvas.getContext('2d');
         if (gCtx) {
@@ -308,13 +254,14 @@ export default function VideoFeed() {
         }
       }
 
-      phase += 0.08;
+      phase += 0.05;
       animId = requestAnimationFrame(renderAudio);
     };
 
-    renderAudio();
+    animId = requestAnimationFrame(renderAudio);
     return () => cancelAnimationFrame(animId);
-  }, [micActive, micVolume, dbHistory, speakerEnabled]);
+  }, [speakerEnabled, dbHistory]);
+
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -464,11 +411,6 @@ export default function VideoFeed() {
     }
   };
 
-  // Multi-segment VU Meter segments (28 discrete LED blocks)
-  const totalSegments = 28;
-  const activeSegments = Math.round((audioDb / 100) * totalSegments);
-  const peakSegmentIndex = Math.round((peakDb / 100) * totalSegments);
-
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Top Tactical Banner */}
@@ -495,23 +437,8 @@ export default function VideoFeed() {
           </div>
         </div>
 
-        {/* Source Switcher, Speaker Button & Global Status */}
+        {/* Source Switcher & Global Status */}
         <div className="flex items-center gap-3">
-          {/* Unmute Speaker Button */}
-          <button
-            onClick={toggleSpeaker}
-            className={clsx(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition shadow-lg",
-              speakerEnabled
-                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-emerald-500/20"
-                : "bg-cyan-500/20 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/30 animate-pulse"
-            )}
-            title="Toggle Browser Speaker Output"
-          >
-            {speakerEnabled ? <Headphones className="w-3.5 h-3.5 text-emerald-400" /> : <Volume2 className="w-3.5 h-3.5 text-cyan-400" />}
-            <span>{speakerEnabled ? "SPEAKER ACTIVE" : "🔊 UNMUTE SPEAKER"}</span>
-          </button>
-
           <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-lg text-xs font-mono">
             <Cpu className="w-3.5 h-3.5 text-secondary" />
             <span className="text-gray-400">SOURCE:</span>
@@ -588,9 +515,9 @@ export default function VideoFeed() {
                   <div className="bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-gray-300 flex items-center gap-2">
                     <span>GPS: 28.61395° N, 77.20910° E</span>
                     <span className="text-gray-400">|</span>
-                    <span className={clsx("flex items-center gap-1", micActive ? "text-emerald-400" : "text-rose-400")}>
+                    <span className="flex items-center gap-1 text-emerald-400">
                       <Mic className="w-3 h-3" />
-                      {micActive ? `${audioDb.toFixed(1)} dB SPL` : "MIC MUTED"}
+                      <span>{audioDb.toFixed(1)} dB SPL</span>
                     </span>
                     <span className="text-gray-400">|</span>
                     <span className={speakerEnabled ? "text-emerald-400 font-bold" : "text-amber-400"}>
@@ -650,106 +577,53 @@ export default function VideoFeed() {
           </div>
 
           {/* ================================================================ */}
-          {/* TACTICAL AUDIO DECIBEL (dB) BAR -- DIRECTLY BELOW VIDEO VIEWPORT  */}
+          {/* MINIMAL AUDIO WIDGET -- MUTE/UNMUTE & REALTIME dB GRAPH          */}
           {/* ================================================================ */}
-          <div className="glass-panel p-3.5 rounded-xl border border-white/10 space-y-2.5 font-mono">
-            {/* Top dB Stats Header */}
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <div className={clsx("w-2.5 h-2.5 rounded-full", micActive ? "bg-emerald-400 animate-ping" : "bg-rose-500")} />
-                <span className="font-bold text-white tracking-wider flex items-center gap-1.5">
-                  <Mic className="w-3.5 h-3.5 text-cyan-400" />
-                  AUDIO DECIBEL LEVEL (dB SPL)
+          <div className="glass-panel p-2.5 px-3.5 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+            {/* Left: Mute / Unmute Button */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleSpeaker}
+                className={clsx(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg border font-bold text-xs transition duration-150 shadow-sm",
+                  speakerEnabled
+                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30"
+                    : "bg-white/5 text-gray-400 border-white/10 hover:text-white hover:bg-white/10"
+                )}
+                title={speakerEnabled ? "Mute Speaker Audio" : "Unmute Speaker Audio"}
+              >
+                {speakerEnabled ? <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" /> : <VolumeX className="w-4 h-4 text-gray-400" />}
+                <span>{speakerEnabled ? "MUTE" : "UNMUTE"}</span>
+              </button>
+
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className={clsx("w-2 h-2 rounded-full", speakerEnabled ? "bg-emerald-400 animate-ping" : "bg-gray-600")} />
+                <span className="font-bold text-gray-300">
+                  {speakerEnabled ? "LIVE AUDIO" : "MUTED"}
                 </span>
               </div>
+            </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 bg-black/50 px-2 py-0.5 rounded border border-white/10">
-                  <span className="text-[10px] text-gray-400">INSTANT:</span>
-                  <span className={clsx("text-xs font-bold font-mono",
-                    audioDb > 75 ? "text-rose-400" : audioDb > 55 ? "text-amber-400" : "text-emerald-400"
-                  )}>
-                    {micActive ? `${audioDb.toFixed(1)} dB` : "MUTED"}
-                  </span>
-                </div>
+            {/* Center: Live Rolling dB Timeline Graph */}
+            <div className="flex-1 min-w-[180px] h-8 bg-black/60 rounded-lg border border-white/10 overflow-hidden relative flex items-center px-2">
+              <canvas ref={audioGraphCanvasRef} width={400} height={32} className="w-full h-full object-cover" />
+            </div>
 
-                <div className="flex items-center gap-1.5 bg-black/50 px-2 py-0.5 rounded border border-white/10">
-                  <span className="text-[10px] text-gray-400">PEAK:</span>
-                  <span className="text-xs font-bold text-cyan-400 font-mono">
-                    {micActive ? `${peakDb.toFixed(1)} dB` : "--"}
-                  </span>
-                </div>
-
-                <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1",
-                  !micActive
-                    ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
-                    : audioDb > 75
-                    ? "bg-rose-500/20 text-rose-400 border-rose-500/40 animate-pulse"
-                    : audioDb > 50
-                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                    : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+            {/* Right: Instant dB Level */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-black/50 px-2.5 py-1 rounded-lg border border-white/10">
+                <span className="text-[10px] text-gray-400">dB:</span>
+                <span className={clsx("font-bold text-xs font-mono",
+                  audioDb > 75 ? "text-rose-400" : audioDb > 55 ? "text-amber-400" : "text-emerald-400"
                 )}>
-                  <Zap className="w-3 h-3" />
-                  {!micActive ? "MIC DISABLED" : audioDb > 75 ? "ACOUSTIC SPIKE" : audioDb > 50 ? "VOICE ACTIVE" : "AMBIENT"}
+                  {audioDb.toFixed(1)} dB
                 </span>
-              </div>
-            </div>
-
-            {/* High-Resolution Multi-Segment LED VU Meter Bar */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 bg-black/80 p-1.5 rounded-lg border border-white/10">
-                {Array.from({ length: totalSegments }).map((_, idx) => {
-                  const isLit = idx < activeSegments && micActive;
-                  const isPeak = idx === peakSegmentIndex && micActive;
-
-                  const ratio = idx / totalSegments;
-                  const segColor = ratio < 0.55
-                    ? "bg-emerald-500 shadow-emerald-500/50"
-                    : ratio < 0.78
-                    ? "bg-amber-400 shadow-amber-400/50"
-                    : "bg-rose-500 shadow-rose-500/50";
-
-                  return (
-                    <div
-                      key={idx}
-                      className={clsx(
-                        "flex-1 h-4 rounded-sm transition-all duration-75 relative",
-                        isLit ? `${segColor} shadow-sm` : "bg-white/5",
-                        isPeak && "ring-1 ring-white"
-                      )}
-                    >
-                      {isPeak && (
-                        <div className="absolute -top-1 left-0 right-0 h-0.5 bg-white rounded-full shadow" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* dB Scale Axis Marks */}
-              <div className="flex justify-between text-[9px] text-gray-500 px-1 font-mono">
-                <span>0 dB (Silence)</span>
-                <span>30 dB (Whisper)</span>
-                <span className="text-emerald-400 font-bold">55 dB (Normal)</span>
-                <span className="text-amber-400 font-bold">75 dB (Speech)</span>
-                <span className="text-rose-400 font-bold">90+ dB (Loud/Gunfire)</span>
-              </div>
-            </div>
-
-            {/* Real-time Rolling Audio dB History Graph */}
-            <div className="pt-1.5 border-t border-white/5 flex flex-col md:flex-row items-center gap-3">
-              <div className="flex items-center gap-1 text-[10px] text-gray-400 shrink-0">
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                <span>dB TIMELINE (30s):</span>
-              </div>
-              <div className="w-full h-8 bg-black/60 rounded-md border border-white/5 overflow-hidden flex-1">
-                <canvas ref={audioGraphCanvasRef} width={480} height={32} className="w-full h-full object-cover" />
               </div>
             </div>
           </div>
 
           {/* Player Controls Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 glass-panel p-3 rounded-xl border border-white/10 text-xs font-mono">
+          <div className="flex flex-wrap items-center justify-between gap-3 glass-panel p-2.5 px-3.5 rounded-xl border border-white/10 text-xs font-mono">
             <div className="flex items-center gap-2">
               <button
                 onClick={captureSnapshot}
@@ -788,8 +662,18 @@ export default function VideoFeed() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Antenna Hardware Badges */}
+              <div className="hidden sm:flex items-center gap-1.5 text-[10px]">
+                <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded font-bold">
+                  ANT-1 [HIGH]
+                </span>
+                <span className="bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded">
+                  ANT-2 [LOW]
+                </span>
+              </div>
+
               <div className="flex items-center gap-1 text-gray-400">
-                <span>FPS CAP:</span>
+                <span>FPS:</span>
                 <button
                   onClick={() => setTargetFps(30)}
                   className={clsx("px-2 py-0.5 rounded font-bold", targetFps === 30 ? "bg-primary text-white" : "hover:text-white")}
@@ -811,92 +695,6 @@ export default function VideoFeed() {
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
-            </div>
-          </div>
-
-          {/* Tactical Audio Oscilloscope & Antenna Status Card */}
-          <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <div className="flex items-center gap-2">
-                <Mic className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                  INMP441 I2S HARDWARE MIC &amp; DUAL-ANTENNA SWITCH
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                16kHz MONO // DMA RX
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-              {/* Audio Waveform Scope (6 cols) */}
-              <div className="md:col-span-6 bg-black/50 border border-white/10 rounded-lg p-2 flex flex-col justify-between h-20">
-                <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <span className={clsx("w-1.5 h-1.5 rounded-full", micActive ? "bg-emerald-400 animate-pulse" : "bg-rose-500")} />
-                    LIVE AUDIO OSCILLOSCOPE
-                  </span>
-                  <span>{audioDb.toFixed(1)} dB / PK</span>
-                </div>
-                <canvas ref={audioCanvasRef} width={320} height={40} className="w-full h-10 object-contain" />
-              </div>
-
-              {/* Mic Controls & Antenna State (6 cols) */}
-              <div className="md:col-span-6 space-y-2.5 text-xs font-mono">
-                <div className="flex items-center justify-between gap-3">
-                  {/* Speaker Button */}
-                  <button
-                    onClick={toggleSpeaker}
-                    className={clsx(
-                      "flex items-center gap-1.5 px-3 py-1 rounded-lg border font-bold text-xs transition",
-                      speakerEnabled
-                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                        : "bg-cyan-500/20 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/30"
-                    )}
-                  >
-                    {speakerEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-                    <span>{speakerEnabled ? "SPEAKER ON" : "SPKR OFF"}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setMicActive(!micActive)}
-                    className={clsx(
-                      "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold text-xs transition",
-                      micActive
-                        ? "bg-white/10 text-white border-white/20"
-                        : "bg-rose-500/20 text-rose-400 border-rose-500/40"
-                    )}
-                  >
-                    {micActive ? <Mic className="w-3 h-3 text-emerald-400" /> : <VolumeX className="w-3 h-3" />}
-                    <span>{micActive ? "MIC RX" : "MUTED"}</span>
-                  </button>
-
-                  <div className="flex items-center gap-2 flex-1 max-w-[130px]">
-                    <span className="text-[10px] text-gray-400">VOL:</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={micVolume}
-                      onChange={(e) => setMicVolume(Number(e.target.value))}
-                      className="w-full accent-cyan-400 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-gray-300 w-6">{micVolume}%</span>
-                  </div>
-                </div>
-
-                {/* Antenna Hardware Badges */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 p-1.5 rounded text-[10px] flex items-center justify-between">
-                    <span className="text-gray-300">ANT-1 (IO2 / Ant 1):</span>
-                    <span className="font-bold text-emerald-400">ACTIVE [HIGH]</span>
-                  </div>
-                  <div className="bg-slate-800/40 border border-white/10 p-1.5 rounded text-[10px] flex items-center justify-between">
-                    <span className="text-gray-400">ANT-2 (IO12 / Ant 2):</span>
-                    <span className="font-bold text-gray-400">STANDBY [LOW]</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
