@@ -19,7 +19,8 @@ import {
   Volume2,
   VolumeX,
   Zap,
-  TrendingUp
+  TrendingUp,
+  Headphones
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -36,7 +37,12 @@ export default function VideoFeed() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const audioCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioGraphCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Web Audio API References for Browser Speaker Output
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const audioAbortControllerRef = useRef<AbortController | null>(null);
+  const nextPlayTimeRef = useRef<number>(0);
 
   // Connection & Stream State
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
@@ -48,8 +54,9 @@ export default function VideoFeed() {
   const [osdEnabled, setOsdEnabled] = useState<boolean>(true);
   const [nightVision, setNightVision] = useState<boolean>(false);
 
-  // Audio / Mic State (INMP441 I2S)
+  // Audio / Speaker Playback State (INMP441 I2S)
   const [micActive, setMicActive] = useState<boolean>(true);
+  const [speakerEnabled, setSpeakerEnabled] = useState<boolean>(false);
   const [micVolume, setMicVolume] = useState<number>(85);
   const [audioDb, setAudioDb] = useState<number>(58.4);
   const [peakDb, setPeakDb] = useState<number>(72.8);
@@ -70,6 +77,120 @@ export default function VideoFeed() {
   const bytesAccumRef = useRef<number>(0);
   const lastBandwidthCalcRef = useRef<number>(performance.now());
 
+  // ==========================================================================
+  // WEB AUDIO API -- SPEAKER OUTPUT & REAL-TIME PCM AUDIO PLAYBACK
+  // ==========================================================================
+  const startSpeakerAudio = async () => {
+    try {
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new AudioCtx({ sampleRate: 16000 });
+        const gain = ctx.createGain();
+        gain.gain.value = micVolume / 100;
+        gain.connect(ctx.destination);
+
+        audioCtxRef.current = ctx;
+        gainNodeRef.current = gain;
+      }
+
+      if (audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume();
+      }
+
+      setSpeakerEnabled(true);
+      nextPlayTimeRef.current = audioCtxRef.current.currentTime;
+
+      // Start streaming audio chunks from video-backend proxy / direct node
+      if (audioAbortControllerRef.current) {
+        audioAbortControllerRef.current.abort();
+      }
+      const abortController = new AbortController();
+      audioAbortControllerRef.current = abortController;
+
+      const audioUrl = `http://${window.location.hostname}:8081/api/audio-stream`;
+      console.log(`[Audio] Connecting to live audio stream at ${audioUrl}...`);
+
+      fetch(audioUrl, { signal: abortController.signal })
+        .then(async (response) => {
+          if (!response.body) return;
+          const reader = response.body.getReader();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            if (value && value.byteLength >= 2 && audioCtxRef.current && gainNodeRef.current) {
+              const ctx = audioCtxRef.current;
+              const int16 = new Int16Array(value.buffer, value.byteOffset, Math.floor(value.byteLength / 2));
+              const float32 = new Float32Array(int16.length);
+
+              // Convert PCM16 to Float32 [-1.0, 1.0] and compute true RMS dB
+              let sumSquares = 0;
+              for (let i = 0; i < int16.length; i++) {
+                const sample = int16[i] / 32768.0;
+                float32[i] = sample;
+                sumSquares += sample * sample;
+              }
+
+              const rms = Math.sqrt(sumSquares / int16.length);
+              const calculatedDb = Math.min(Math.max(Math.round((20 * Math.log10(rms + 1e-4) + 94) * 10) / 10, 25), 105);
+              setAudioDb(calculatedDb);
+
+              // Schedule audio buffer playback
+              const audioBuffer = ctx.createBuffer(1, float32.length, 16000);
+              audioBuffer.getChannelData(0).set(float32);
+
+              const sourceNode = ctx.createBufferSource();
+              sourceNode.buffer = audioBuffer;
+              sourceNode.connect(gainNodeRef.current);
+
+              const now = ctx.currentTime;
+              if (nextPlayTimeRef.current < now) {
+                nextPlayTimeRef.current = now;
+              }
+              sourceNode.start(nextPlayTimeRef.current);
+              nextPlayTimeRef.current += audioBuffer.duration;
+            }
+          }
+        })
+        .catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.log('[Audio] Stream not yet reachable from hardware, live feedback active.');
+          }
+        });
+    } catch (err) {
+      console.error('[Audio] AudioContext start error:', err);
+    }
+  };
+
+  const stopSpeakerAudio = () => {
+    if (audioAbortControllerRef.current) {
+      audioAbortControllerRef.current.abort();
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
+      audioCtxRef.current.suspend();
+    }
+    setSpeakerEnabled(false);
+  };
+
+  const toggleSpeaker = () => {
+    if (speakerEnabled) {
+      stopSpeakerAudio();
+    } else {
+      startSpeakerAudio();
+    }
+  };
+
+  // Adjust volume on the live Web Audio Gain Node
+  useEffect(() => {
+    if (gainNodeRef.current && audioCtxRef.current) {
+      gainNodeRef.current.gain.setValueAtTime(
+        micActive ? micVolume / 100 : 0,
+        audioCtxRef.current.currentTime
+      );
+    }
+  }, [micVolume, micActive]);
+
   // Tactical Audio Waveform & dB History Animation
   useEffect(() => {
     let animId: number;
@@ -80,9 +201,11 @@ export default function VideoFeed() {
     const renderAudio = () => {
       // 1. Calculate Real-time Audio dB Level
       if (micActive) {
-        const baseLevel = 45 + Math.sin(phase * 1.8) * 16 + (Math.random() * 12);
+        const baseLevel = 48 + Math.sin(phase * 1.8) * 16 + (Math.random() * 10);
         const currentDbVal = Math.min(Math.max(Math.round(baseLevel * 10) / 10, 20), 98);
-        setAudioDb(currentDbVal);
+        
+        // If not receiving live stream from mic, generate live simulated noise level
+        setAudioDb(prev => (prev === 58.4 || prev < 10) ? currentDbVal : prev);
         setPeakDb(prev => Math.max(prev * 0.992, currentDbVal));
 
         setDbHistory(prev => {
@@ -107,7 +230,7 @@ export default function VideoFeed() {
             ctx.lineTo(waveCanvas.width, waveCanvas.height / 2);
             ctx.stroke();
           } else {
-            ctx.strokeStyle = '#06b6d4';
+            ctx.strokeStyle = speakerEnabled ? '#10b981' : '#06b6d4';
             ctx.lineWidth = 2;
             ctx.beginPath();
             const amplitude = (micVolume / 100) * 16;
@@ -129,19 +252,17 @@ export default function VideoFeed() {
         if (gCtx) {
           gCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
           
-          // Draw Grid Lines (30dB, 60dB, 80dB)
+          // Draw Grid Lines (50dB, 80dB)
           gCtx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
           gCtx.lineWidth = 1;
           gCtx.setLineDash([4, 4]);
 
-          // 80dB line (Red Alert threshold)
           const y80 = graphCanvas.height - (80 / 100) * graphCanvas.height;
           gCtx.beginPath();
           gCtx.moveTo(0, y80);
           gCtx.lineTo(graphCanvas.width, y80);
           gCtx.stroke();
 
-          // 50dB line (Speech threshold)
           const y50 = graphCanvas.height - (50 / 100) * graphCanvas.height;
           gCtx.beginPath();
           gCtx.moveTo(0, y50);
@@ -154,10 +275,8 @@ export default function VideoFeed() {
           if (dbHistory.length > 1) {
             const step = graphCanvas.width / (dbHistory.length - 1);
 
-            // Gradient Fill
             const grad = gCtx.createLinearGradient(0, 0, 0, graphCanvas.height);
-            grad.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
-            grad.addColorStop(0.5, 'rgba(6, 182, 212, 0.2)');
+            grad.addColorStop(0, speakerEnabled ? 'rgba(16, 185, 129, 0.35)' : 'rgba(6, 182, 212, 0.25)');
             grad.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
 
             gCtx.fillStyle = grad;
@@ -175,8 +294,7 @@ export default function VideoFeed() {
             gCtx.closePath();
             gCtx.fill();
 
-            // Line stroke
-            gCtx.strokeStyle = '#10b981';
+            gCtx.strokeStyle = speakerEnabled ? '#10b981' : '#06b6d4';
             gCtx.lineWidth = 2;
             gCtx.beginPath();
             dbHistory.forEach((val, idx) => {
@@ -196,7 +314,7 @@ export default function VideoFeed() {
 
     renderAudio();
     return () => cancelAnimationFrame(animId);
-  }, [micActive, micVolume, dbHistory]);
+  }, [micActive, micVolume, dbHistory, speakerEnabled]);
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -207,7 +325,7 @@ export default function VideoFeed() {
 
     setStreamStatus('connecting');
 
-    const wsUrl = 'ws://localhost:8080';
+    const wsUrl = `ws://${window.location.hostname}:8080`;
     console.log(`[VideoFeed] Connecting to WebSocket relay at ${wsUrl}...`);
 
     try {
@@ -223,11 +341,9 @@ export default function VideoFeed() {
       ws.onmessage = (event: MessageEvent) => {
         const now = performance.now();
 
-        // Handle binary JPEG frame from ESP32
         if (event.data instanceof ArrayBuffer) {
           bytesAccumRef.current += event.data.byteLength;
 
-          // Rolling FPS calculation
           frameTimesRef.current.push(now);
           if (frameTimesRef.current.length > 30) {
             frameTimesRef.current.shift();
@@ -237,7 +353,6 @@ export default function VideoFeed() {
             const timeDiff = (frameTimesRef.current[frameTimesRef.current.length - 1] - frameTimesRef.current[0]) / (frameTimesRef.current.length - 1);
             const calculatedFps = Math.round(1000 / timeDiff);
 
-            // Bandwidth calc every 1 second
             if (now - lastBandwidthCalcRef.current >= 1000) {
               const kbps = Math.round((bytesAccumRef.current * 8) / 1024 / ((now - lastBandwidthCalcRef.current) / 1000));
               bytesAccumRef.current = 0;
@@ -259,7 +374,6 @@ export default function VideoFeed() {
             }
           }
 
-          // Render JPEG binary buffer directly to HTML5 Canvas
           const blob = new Blob([event.data], { type: 'image/jpeg' });
           const img = new Image();
 
@@ -324,6 +438,9 @@ export default function VideoFeed() {
       if (wsRef.current) {
         wsRef.current.close();
       }
+      if (audioAbortControllerRef.current) {
+        audioAbortControllerRef.current.abort();
+      }
     };
   }, [connectWebSocket]);
 
@@ -373,13 +490,28 @@ export default function VideoFeed() {
               </span>
             </div>
             <p className="text-xs text-gray-400 font-mono">
-              DIRECT WI-FI &amp; WEBSOCKET RELAY // 720p HD @ 30 FPS + LIVE AUDIO TELEMETRY
+              DIRECT WI-FI &amp; WEBSOCKET RELAY // 720p HD @ 30 FPS + WEB AUDIO LIVE SPEAKER STREAM
             </p>
           </div>
         </div>
 
-        {/* Source Switcher & Global Status */}
+        {/* Source Switcher, Speaker Button & Global Status */}
         <div className="flex items-center gap-3">
+          {/* Unmute Speaker Button */}
+          <button
+            onClick={toggleSpeaker}
+            className={clsx(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition shadow-lg",
+              speakerEnabled
+                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-emerald-500/20"
+                : "bg-cyan-500/20 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/30 animate-pulse"
+            )}
+            title="Toggle Browser Speaker Output"
+          >
+            {speakerEnabled ? <Headphones className="w-3.5 h-3.5 text-emerald-400" /> : <Volume2 className="w-3.5 h-3.5 text-cyan-400" />}
+            <span>{speakerEnabled ? "SPEAKER ACTIVE" : "🔊 UNMUTE SPEAKER"}</span>
+          </button>
+
           <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-lg text-xs font-mono">
             <Cpu className="w-3.5 h-3.5 text-secondary" />
             <span className="text-gray-400">SOURCE:</span>
@@ -423,9 +555,6 @@ export default function VideoFeed() {
               className="w-full h-full object-contain"
             />
 
-            {/* Hidden Audio Player for live stream */}
-            <audio ref={audioRef} autoPlay playsInline muted={!micActive} />
-
             {/* Tactical OSD (On-Screen Display) Overlay */}
             {osdEnabled && streamStatus === 'connected' && (
               <>
@@ -462,6 +591,10 @@ export default function VideoFeed() {
                     <span className={clsx("flex items-center gap-1", micActive ? "text-emerald-400" : "text-rose-400")}>
                       <Mic className="w-3 h-3" />
                       {micActive ? `${audioDb.toFixed(1)} dB SPL` : "MIC MUTED"}
+                    </span>
+                    <span className="text-gray-400">|</span>
+                    <span className={speakerEnabled ? "text-emerald-400 font-bold" : "text-amber-400"}>
+                      {speakerEnabled ? "🔊 SPKR ON" : "🔇 SPKR MUTED"}
                     </span>
                   </div>
 
@@ -541,7 +674,7 @@ export default function VideoFeed() {
                 </div>
 
                 <div className="flex items-center gap-1.5 bg-black/50 px-2 py-0.5 rounded border border-white/10">
-                  <span className="text-[10px] text-gray-400">PEAK HOLD:</span>
+                  <span className="text-[10px] text-gray-400">PEAK:</span>
                   <span className="text-xs font-bold text-cyan-400 font-mono">
                     {micActive ? `${peakDb.toFixed(1)} dB` : "--"}
                   </span>
@@ -569,7 +702,6 @@ export default function VideoFeed() {
                   const isLit = idx < activeSegments && micActive;
                   const isPeak = idx === peakSegmentIndex && micActive;
 
-                  // Segment color zoning: Green (0-55%), Yellow (55-75%), Red (75-100%)
                   const ratio = idx / totalSegments;
                   const segColor = ratio < 0.55
                     ? "bg-emerald-500 shadow-emerald-500/50"
@@ -712,20 +844,34 @@ export default function VideoFeed() {
               {/* Mic Controls & Antenna State (6 cols) */}
               <div className="md:col-span-6 space-y-2.5 text-xs font-mono">
                 <div className="flex items-center justify-between gap-3">
+                  {/* Speaker Button */}
+                  <button
+                    onClick={toggleSpeaker}
+                    className={clsx(
+                      "flex items-center gap-1.5 px-3 py-1 rounded-lg border font-bold text-xs transition",
+                      speakerEnabled
+                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                        : "bg-cyan-500/20 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/30"
+                    )}
+                  >
+                    {speakerEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    <span>{speakerEnabled ? "SPEAKER ON" : "SPKR OFF"}</span>
+                  </button>
+
                   <button
                     onClick={() => setMicActive(!micActive)}
                     className={clsx(
-                      "flex items-center gap-1.5 px-3 py-1 rounded-lg border font-bold text-xs transition",
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold text-xs transition",
                       micActive
-                        ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/40"
+                        ? "bg-white/10 text-white border-white/20"
                         : "bg-rose-500/20 text-rose-400 border-rose-500/40"
                     )}
                   >
-                    {micActive ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-                    <span>{micActive ? "MIC LIVE" : "MIC MUTED"}</span>
+                    {micActive ? <Mic className="w-3 h-3 text-emerald-400" /> : <VolumeX className="w-3 h-3" />}
+                    <span>{micActive ? "MIC RX" : "MUTED"}</span>
                   </button>
 
-                  <div className="flex items-center gap-2 flex-1 max-w-[140px]">
+                  <div className="flex items-center gap-2 flex-1 max-w-[130px]">
                     <span className="text-[10px] text-gray-400">VOL:</span>
                     <input
                       type="range"
