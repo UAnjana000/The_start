@@ -16,8 +16,8 @@ const WebSocket = require('ws');
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
-const WS_PORT = process.env.WS_PORT || 8080;
-const HTTP_PORT = process.env.HTTP_PORT || 8081;
+const WS_PORT = process.env.WS_PORT || 8090;
+const HTTP_PORT = process.env.HTTP_PORT || 8091;
 
 // Default node video stream sources (can be expanded for multiple soldier helmets)
 const STREAM_SOURCES = {

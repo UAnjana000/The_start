@@ -98,7 +98,8 @@ export default function VideoFeed() {
       const abortController = new AbortController();
       audioAbortControllerRef.current = abortController;
 
-      const audioUrl = `http://${window.location.hostname}:8081/api/audio-stream`;
+      const audioPort = (import.meta as unknown as { env: { VITE_HTTP_PORT?: string } }).env?.VITE_HTTP_PORT || '8091';
+      const audioUrl = `http://${window.location.hostname}:${audioPort}/api/audio-stream`;
       console.log(`[Audio] Connecting to live audio stream at ${audioUrl}...`);
 
       fetch(audioUrl, { signal: abortController.signal })
@@ -202,7 +203,8 @@ export default function VideoFeed() {
 
     setStreamStatus('connecting');
 
-    const wsUrl = `ws://${window.location.hostname}:8080`;
+    const wsPort = (import.meta as unknown as { env: { VITE_WS_PORT?: string } }).env?.VITE_WS_PORT || '8090';
+    const wsUrl = `ws://${window.location.hostname}:${wsPort}`;
     console.log(`[VideoFeed] Connecting to WebSocket relay at ${wsUrl}...`);
 
     try {
@@ -475,7 +477,7 @@ export default function VideoFeed() {
                     <RefreshCw className="w-10 h-10 text-primary animate-spin" />
                     <div>
                       <h3 className="text-sm font-bold text-white">ESTABLISHING TACTICAL STREAM BRIDGE...</h3>
-                      <p className="text-xs text-gray-400 font-mono mt-1">Connecting to ws://localhost:8080 (ESP32-CAM Stream Ingest)</p>
+                      <p className="text-xs text-gray-400 font-mono mt-1">Connecting to ws://localhost:8090 (ESP32-CAM Stream Ingest)</p>
                     </div>
                   </>
                 )}
