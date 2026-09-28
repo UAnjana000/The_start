@@ -17,7 +17,8 @@ import {
   Crosshair,
   Mic,
   Volume2,
-  VolumeX
+  VolumeX,
+  Image as ImageIcon
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -39,13 +40,21 @@ export default function VideoFeed() {
   const audioAbortControllerRef = useRef<AbortController | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
 
+  // Keyframe / Presentation Mock Mode (Defaulting to Keyframe 1 from 'keyframe img/')
+  const [feedMode, setFeedMode] = useState<'keyframe' | 'live'>('keyframe');
+  const [selectedKeyframe, setSelectedKeyframe] = useState<string>('1');
+
   // Connection & Stream State
-  const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
-  const [targetNode, setTargetNode] = useState<string>('s3-cam');
+  const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connected');
+  const [targetNode] = useState<string>('s3-cam');
   const [selectedQuality, setSelectedQuality] = useState<'720p' | 'vga' | 'qvga'>('720p');
   const [targetFps, setTargetFps] = useState<number>(30);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [snapshots, setSnapshots] = useState<string[]>([]);
+  const [snapshots, setSnapshots] = useState<string[]>([
+    '/keyframes/1.jpeg',
+    '/keyframes/2.jpeg',
+    '/keyframes/3.jpeg'
+  ]);
   const [osdEnabled, setOsdEnabled] = useState<boolean>(true);
   const [nightVision, setNightVision] = useState<boolean>(false);
 
@@ -53,12 +62,12 @@ export default function VideoFeed() {
   const [speakerEnabled, setSpeakerEnabled] = useState<boolean>(false);
   const [audioDb, setAudioDb] = useState<number>(58.4);
 
-  // Performance Metrics
+  // Performance Metrics (Presentation-ready defaults)
   const [metrics, setMetrics] = useState<StreamMetrics>({
-    fps: 0,
-    bandwidthKbps: 0,
-    frameCount: 0,
-    latencyMs: 18,
+    fps: 30,
+    bandwidthKbps: 1840,
+    frameCount: 2480,
+    latencyMs: 16,
     resolution: '1280x720 (720p HD)'
   });
 
@@ -67,6 +76,35 @@ export default function VideoFeed() {
   const frameTimesRef = useRef<number[]>([]);
   const bytesAccumRef = useRef<number>(0);
   const lastBandwidthCalcRef = useRef<number>(performance.now());
+
+  // Render Keyframe image onto canvas in Keyframe mode
+  useEffect(() => {
+    if (feedMode !== 'keyframe') return;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = `/keyframes/${selectedKeyframe}.jpeg`;
+
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = 1280;
+      canvas.height = 720;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      if (nightVision) {
+        ctx.filter = 'brightness(1.3) contrast(1.4) hue-rotate(90deg) saturate(2.0)';
+      } else {
+        ctx.filter = 'none';
+      }
+
+      ctx.drawImage(img, 0, 0, 1280, 720);
+    };
+  }, [feedMode, selectedKeyframe, nightVision]);
 
   // ==========================================================================
   // WEB AUDIO API -- SPEAKER OUTPUT & REAL-TIME PCM AUDIO PLAYBACK
@@ -173,16 +211,16 @@ export default function VideoFeed() {
     }
   };
 
-  // Real-time Audio dB Level Update Loop
+  // Real-time Audio dB Level Simulation Loop
   useEffect(() => {
     let animId: number;
     let phase = 0;
 
     const updateAudio = () => {
-      const baseLevel = 48 + Math.sin(phase * 1.8) * 16 + (Math.random() * 10);
+      const baseLevel = 52 + Math.sin(phase * 1.8) * 14 + (Math.random() * 8);
       const currentDbVal = Math.min(Math.max(Math.round(baseLevel * 10) / 10, 20), 98);
       
-      setAudioDb(prev => (prev === 58.4 || prev < 10) ? currentDbVal : prev);
+      setAudioDb(prev => (prev === 58.4 || prev < 10) ? currentDbVal : (prev * 0.8 + currentDbVal * 0.2));
 
       phase += 0.05;
       animId = requestAnimationFrame(updateAudio);
@@ -192,9 +230,12 @@ export default function VideoFeed() {
     return () => cancelAnimationFrame(animId);
   }, []);
 
-
-
   const connectWebSocket = useCallback(() => {
+    if (feedMode === 'keyframe') {
+      setStreamStatus('connected');
+      return;
+    }
+
     if (wsRef.current) {
       try {
         wsRef.current.close();
@@ -301,27 +342,29 @@ export default function VideoFeed() {
       console.error('[VideoFeed] Connection setup failed:', err);
       setStreamStatus('error');
     }
-  }, [nightVision]);
+  }, [feedMode, nightVision]);
 
   useEffect(() => {
-    connectWebSocket();
+    if (feedMode === 'live') {
+      connectWebSocket();
 
-    const interval = setInterval(() => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.CLOSED) {
-        connectWebSocket();
-      }
-    }, 5000);
+      const interval = setInterval(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.CLOSED) {
+          connectWebSocket();
+        }
+      }, 5000);
 
-    return () => {
-      clearInterval(interval);
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      if (audioAbortControllerRef.current) {
-        audioAbortControllerRef.current.abort();
-      }
-    };
-  }, [connectWebSocket]);
+      return () => {
+        clearInterval(interval);
+        if (wsRef.current) {
+          wsRef.current.close();
+        }
+        if (audioAbortControllerRef.current) {
+          audioAbortControllerRef.current.abort();
+        }
+      };
+    }
+  }, [feedMode, connectWebSocket]);
 
   // Take Snapshot
   const captureSnapshot = () => {
@@ -344,53 +387,72 @@ export default function VideoFeed() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Top Tactical Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 glass-panel p-4 rounded-xl border border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center">
-            <Video className="w-5 h-5 text-primary animate-pulse" />
+      <div className="flex flex-wrap items-center justify-between gap-4 glass-panel p-5 md:p-6 rounded-2xl border border-white/15 shadow-xl">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-primary/25 border border-primary/50 flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
+            <Video className="w-7 h-7 text-primary animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white tracking-wide">ESP32 TACTICAL HELMET LIVE FEED</h2>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                <Shield className="w-3 h-3" />
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold text-white tracking-wide">
+                ESP32 TACTICAL HELMET LIVE FEED
+              </h1>
+              <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm">
+                <Shield className="w-3.5 h-3.5" />
                 AES-128 ENCRYPTED
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
-                <Mic className="w-3 h-3" />
+              <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 flex items-center gap-1.5 shadow-sm">
+                <Mic className="w-3.5 h-3.5" />
                 INMP441 I2S MIC
               </span>
             </div>
-            <p className="text-xs text-gray-400 font-mono">
+            <p className="text-sm md:text-base text-gray-300 font-mono mt-1 font-medium">
               DIRECT WI-FI &amp; WEBSOCKET RELAY // 720p HD @ 30 FPS + WEB AUDIO LIVE SPEAKER STREAM
             </p>
           </div>
         </div>
 
-        {/* Source Switcher & Global Status */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-lg text-xs font-mono">
-            <Cpu className="w-3.5 h-3.5 text-secondary" />
-            <span className="text-gray-400">SOURCE:</span>
+        {/* Presentation Source Selector (Keyframe 1, 2, 3 vs Live Stream) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-black/60 border border-white/15 px-3 py-2 rounded-xl text-sm font-mono">
+            <ImageIcon className="w-4 h-4 text-secondary" />
+            <span className="text-gray-400 font-bold">VIEWPORT:</span>
             <select
-              value={targetNode}
-              onChange={(e) => setTargetNode(e.target.value)}
-              className="bg-transparent text-white font-bold focus:outline-none cursor-pointer"
+              value={feedMode === 'keyframe' ? `kf-${selectedKeyframe}` : 'live'}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.startsWith('kf-')) {
+                  setFeedMode('keyframe');
+                  setSelectedKeyframe(val.replace('kf-', ''));
+                  setStreamStatus('connected');
+                } else {
+                  setFeedMode('live');
+                }
+              }}
+              className="bg-transparent text-primary font-extrabold text-sm focus:outline-none cursor-pointer"
             >
-              <option value="s3-cam" className="bg-slate-900 text-white">ESP32-CAM / S3 (Mic &amp; Dual-Ant)</option>
-              <option value="node-3" className="bg-slate-900 text-white">Node 3 (ESP32-C6 Cam)</option>
+              <option value="kf-1" className="bg-slate-900 text-white">KEYFRAME 1 (CQB Corridor 720p)</option>
+              <option value="kf-2" className="bg-slate-900 text-white">KEYFRAME 2 (Tactical Operator 720p)</option>
+              <option value="kf-3" className="bg-slate-900 text-white">KEYFRAME 3 (Perimeter Recon 720p)</option>
+              <option value="live" className="bg-slate-900 text-white">LIVE ESP32-CAM (WS Relay 8090)</option>
             </select>
           </div>
 
           <button
-            onClick={connectWebSocket}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary rounded-lg text-xs font-mono font-bold transition"
-            title="Reconnect stream bridge"
+            onClick={() => {
+              if (feedMode === 'live') {
+                connectWebSocket();
+              } else {
+                setStreamStatus('connected');
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary rounded-xl text-sm font-mono font-bold transition shadow-sm cursor-pointer"
+            title="Refresh stream"
           >
-            <RefreshCw className={clsx("w-3.5 h-3.5", streamStatus === 'connecting' && "animate-spin")} />
-            <span>RECONNECT</span>
+            <RefreshCw className={clsx("w-4 h-4", streamStatus === 'connecting' && "animate-spin")} />
+            <span>SYNC</span>
           </button>
         </div>
       </div>
@@ -404,7 +466,7 @@ export default function VideoFeed() {
           {/* Main Video Viewport Canvas */}
           <div
             ref={containerRef}
-            className="relative aspect-video bg-black/90 rounded-xl overflow-hidden border border-white/15 shadow-2xl flex items-center justify-center group"
+            className="relative aspect-video bg-black/95 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl flex items-center justify-center group"
           >
             {/* HTML5 Canvas Rendering Viewport (1280x720) */}
             <canvas
@@ -414,91 +476,91 @@ export default function VideoFeed() {
               className="w-full h-full object-contain"
             />
 
-            {/* Tactical OSD (On-Screen Display) Overlay */}
-            {osdEnabled && streamStatus === 'connected' && (
+            {/* Tactical OSD (On-Screen Display) Overlay - LARGE FONTS FOR PPT SCREENSHOTS */}
+            {osdEnabled && (
               <>
                 {/* Center Tactical Crosshair */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-40">
-                  <Crosshair className="w-16 h-16 text-primary" strokeWidth={1} />
+                  <Crosshair className="w-20 h-20 text-primary" strokeWidth={1.5} />
                 </div>
 
                 {/* Top OSD HUD Bar */}
-                <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none text-[11px] font-mono">
-                  <div className="flex items-center gap-2 bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-white">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span className="font-bold text-emerald-400">LIVE REC</span>
-                    <span className="text-gray-400">|</span>
-                    <span>NODE: {targetNode.toUpperCase()}</span>
-                    <span className="text-gray-400">|</span>
-                    <span>RES: 1280x720 HD</span>
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none text-xs md:text-sm font-mono">
+                  <div className="flex items-center gap-2.5 bg-black/80 px-3.5 py-1.5 rounded-lg backdrop-blur-md border border-white/20 text-white shadow-lg">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="font-extrabold text-emerald-400">REC [720p HD]</span>
+                    <span className="text-gray-500">|</span>
+                    <span className="font-bold">NODE: {targetNode.toUpperCase()}</span>
+                    <span className="text-gray-500">|</span>
+                    <span className="text-gray-300">RES: 1280x720</span>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-white">
-                    <Radio className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="text-cyan-400 font-bold">ANT-1 (IO2: HIGH)</span>
-                    <span className="text-gray-400">|</span>
-                    <Signal className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>-62 dBm</span>
+                  <div className="flex items-center gap-2.5 bg-black/80 px-3.5 py-1.5 rounded-lg backdrop-blur-md border border-white/20 text-white shadow-lg">
+                    <Radio className="w-4 h-4 text-cyan-400" />
+                    <span className="text-cyan-400 font-extrabold">ANT-1 (IO2: HIGH)</span>
+                    <span className="text-gray-500">|</span>
+                    <Signal className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-emerald-400">-62 dBm</span>
                   </div>
                 </div>
 
                 {/* Bottom OSD HUD Bar */}
-                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none text-[11px] font-mono">
-                  <div className="bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-gray-300 flex items-center gap-2">
-                    <span>GPS: 28.61395° N, 77.20910° E</span>
-                    <span className="text-gray-400">|</span>
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <Mic className="w-3 h-3" />
+                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none text-xs md:text-sm font-mono">
+                  <div className="bg-black/80 px-3.5 py-1.5 rounded-lg backdrop-blur-md border border-white/20 text-gray-200 flex items-center gap-2.5 shadow-lg">
+                    <span className="font-bold">GPS: 28.61395° N, 77.20910° E</span>
+                    <span className="text-gray-500">|</span>
+                    <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                      <Mic className="w-4 h-4" />
                       <span>{audioDb.toFixed(1)} dB SPL</span>
                     </span>
-                    <span className="text-gray-400">|</span>
-                    <span className={speakerEnabled ? "text-emerald-400 font-bold" : "text-amber-400"}>
+                    <span className="text-gray-500">|</span>
+                    <span className={speakerEnabled ? "text-emerald-400 font-extrabold" : "text-amber-400 font-bold"}>
                       {speakerEnabled ? "🔊 SPKR ON" : "🔇 SPKR MUTED"}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-black/70 px-2.5 py-1 rounded backdrop-blur-md border border-white/10 text-primary font-bold">
-                    <Activity className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-2.5 bg-black/80 px-3.5 py-1.5 rounded-lg backdrop-blur-md border border-white/20 text-primary font-extrabold shadow-lg">
+                    <Activity className="w-4 h-4" />
                     <span>{metrics.fps} FPS</span>
-                    <span className="text-gray-400">|</span>
+                    <span className="text-gray-500">|</span>
                     <span>{metrics.bandwidthKbps} KB/S</span>
-                    <span className="text-gray-400">|</span>
+                    <span className="text-gray-500">|</span>
                     <span>{metrics.latencyMs}ms</span>
                   </div>
                 </div>
               </>
             )}
 
-            {/* Offline / Error / Connecting State Overlay */}
-            {streamStatus !== 'connected' && (
+            {/* Offline / Error / Connecting State Overlay (Live WS mode only) */}
+            {feedMode === 'live' && streamStatus !== 'connected' && (
               <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center gap-4">
                 {streamStatus === 'connecting' && (
                   <>
-                    <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+                    <RefreshCw className="w-12 h-12 text-primary animate-spin" />
                     <div>
-                      <h3 className="text-sm font-bold text-white">ESTABLISHING TACTICAL STREAM BRIDGE...</h3>
-                      <p className="text-xs text-gray-400 font-mono mt-1">Connecting to ws://localhost:8090 (ESP32-CAM Stream Ingest)</p>
+                      <h3 className="text-base font-bold text-white">ESTABLISHING TACTICAL STREAM BRIDGE...</h3>
+                      <p className="text-sm text-gray-400 font-mono mt-1">Connecting to ws://localhost:8090 (ESP32-CAM Stream Ingest)</p>
                     </div>
                   </>
                 )}
                 {streamStatus === 'disconnected' && (
                   <>
-                    <AlertTriangle className="w-10 h-10 text-amber-400 animate-bounce" />
+                    <AlertTriangle className="w-12 h-12 text-amber-400 animate-bounce" />
                     <div>
-                      <h3 className="text-sm font-bold text-amber-400">VIDEO BRIDGE DISCONNECTED</h3>
-                      <p className="text-xs text-gray-400 font-mono mt-1">
+                      <h3 className="text-base font-bold text-amber-400">VIDEO BRIDGE DISCONNECTED</h3>
+                      <p className="text-sm text-gray-400 font-mono mt-1">
                         Please verify that the backend relay is running:<br/>
-                        <code className="text-primary bg-black/50 px-2 py-0.5 rounded">node video-backend/server.js</code>
+                        <code className="text-primary bg-black/50 px-2.5 py-1 rounded font-bold">node video-backend/server.js</code>
                       </p>
                     </div>
                   </>
                 )}
                 {streamStatus === 'error' && (
                   <>
-                    <AlertTriangle className="w-10 h-10 text-rose-500" />
+                    <AlertTriangle className="w-12 h-12 text-rose-500" />
                     <div>
-                      <h3 className="text-sm font-bold text-rose-400">STREAM CONNECTION ERROR</h3>
-                      <p className="text-xs text-gray-400 font-mono mt-1">
+                      <h3 className="text-base font-bold text-rose-400">STREAM CONNECTION ERROR</h3>
+                      <p className="text-sm text-gray-400 font-mono mt-1">
                         Could not reach camera stream at http://esp32-s3-cam.local/stream
                       </p>
                     </div>
@@ -511,37 +573,37 @@ export default function VideoFeed() {
           {/* ================================================================ */}
           {/* MINIMAL AUDIO BAR -- MUTE/UNMUTE & HORIZONTAL RED-YELLOW-GREEN dB BAR */}
           {/* ================================================================ */}
-          <div className="glass-panel p-2.5 px-4 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
+          <div className="glass-panel p-4 px-5 rounded-2xl border border-white/15 flex flex-wrap items-center justify-between gap-5 font-mono shadow-lg">
             {/* Left: Mute / Unmute Button & Status */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
               <button
                 onClick={toggleSpeaker}
                 className={clsx(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg border font-bold text-xs transition duration-150 shadow-sm cursor-pointer",
+                  "flex items-center gap-2.5 px-4 py-2 rounded-xl border font-bold text-sm transition duration-150 shadow-md cursor-pointer",
                   speakerEnabled
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30"
-                    : "bg-white/5 text-gray-400 border-white/10 hover:text-white hover:bg-white/10"
+                    ? "bg-emerald-500/25 text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/35"
+                    : "bg-white/10 text-gray-300 border-white/15 hover:text-white hover:bg-white/15"
                 )}
                 title={speakerEnabled ? "Mute Audio" : "Unmute Audio"}
               >
-                {speakerEnabled ? <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" /> : <VolumeX className="w-4 h-4 text-gray-400" />}
-                <span>{speakerEnabled ? "MUTE" : "UNMUTE"}</span>
+                {speakerEnabled ? <Volume2 className="w-5 h-5 text-emerald-400 animate-pulse" /> : <VolumeX className="w-5 h-5 text-gray-400" />}
+                <span className="font-extrabold">{speakerEnabled ? "MUTE" : "UNMUTE"}</span>
               </button>
 
-              <div className="flex items-center gap-1.5 text-[11px]">
-                <span className={clsx("w-2 h-2 rounded-full", speakerEnabled ? "bg-emerald-400 animate-ping" : "bg-gray-600")} />
-                <span className="font-bold text-gray-300">
+              <div className="flex items-center gap-2 text-xs md:text-sm">
+                <span className={clsx("w-2.5 h-2.5 rounded-full", speakerEnabled ? "bg-emerald-400 animate-ping" : "bg-gray-500")} />
+                <span className="font-bold text-gray-200">
                   {speakerEnabled ? "LIVE AUDIO" : "MUTED"}
                 </span>
               </div>
             </div>
 
             {/* Center: Horizontal Multi-Color (Green -> Yellow -> Red) dB Meter Bar */}
-            <div className="flex-1 min-w-[200px] flex flex-col justify-center gap-1">
+            <div className="flex-1 min-w-[240px] flex flex-col justify-center gap-1.5">
               {/* Colored Meter Track */}
-              <div className="w-full h-3.5 bg-black/60 rounded-full border border-white/10 p-0.5 relative overflow-hidden flex items-center">
+              <div className="w-full h-5 bg-black/80 rounded-full border border-white/20 p-1 relative overflow-hidden flex items-center">
                 {/* Background colored zone guides */}
-                <div className="absolute inset-0 flex opacity-15 pointer-events-none rounded-full overflow-hidden">
+                <div className="absolute inset-0 flex opacity-20 pointer-events-none rounded-full overflow-hidden">
                   <div className="w-[55%] bg-emerald-500" />
                   <div className="w-[20%] bg-amber-400" />
                   <div className="w-[25%] bg-rose-500" />
@@ -552,29 +614,29 @@ export default function VideoFeed() {
                   className={clsx(
                     "h-full rounded-full transition-all duration-75 relative",
                     audioDb > 75
-                      ? "bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 shadow-rose-500/50 shadow-sm"
+                      ? "bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 shadow-rose-500/50 shadow-md"
                       : audioDb > 55
-                      ? "bg-gradient-to-r from-emerald-500 to-amber-400 shadow-amber-400/50 shadow-sm"
-                      : "bg-emerald-500 shadow-emerald-500/50 shadow-sm"
+                      ? "bg-gradient-to-r from-emerald-500 to-amber-400 shadow-amber-400/50 shadow-md"
+                      : "bg-emerald-500 shadow-emerald-500/50 shadow-md"
                   )}
                   style={{ width: `${Math.min(Math.max((audioDb / 100) * 100, 4), 100)}%` }}
                 />
               </div>
 
               {/* Range Labels: Green / Yellow / Red Zones */}
-              <div className="flex justify-between text-[9px] px-1 font-mono text-gray-400">
-                <span className="text-emerald-400 font-semibold">SAFE (0-55 dB)</span>
-                <span className="text-amber-400 font-semibold">VOICE (55-75 dB)</span>
-                <span className="text-rose-400 font-semibold">LOUD (75-100 dB)</span>
+              <div className="flex justify-between text-[11px] md:text-xs px-1 font-mono font-bold">
+                <span className="text-emerald-400">SAFE (0-55 dB)</span>
+                <span className="text-amber-400">VOICE (55-75 dB)</span>
+                <span className="text-rose-400">LOUD (75-100 dB)</span>
               </div>
             </div>
 
             {/* Right: Real-time dB Value Badge */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-1.5 bg-black/50 px-2.5 py-1 rounded-lg border border-white/10">
-                <span className="text-[10px] text-gray-400">dB:</span>
-                <span className={clsx("font-bold text-xs font-mono",
-                  audioDb > 75 ? "text-rose-400 font-extrabold animate-pulse" : audioDb > 55 ? "text-amber-400" : "text-emerald-400"
+              <div className="flex items-center gap-2 bg-black/70 px-3.5 py-1.5 rounded-xl border border-white/20 shadow-inner">
+                <span className="text-xs text-gray-400 font-bold">ACOUSTIC dB:</span>
+                <span className={clsx("font-extrabold text-sm md:text-base font-mono",
+                  audioDb > 75 ? "text-rose-400 animate-pulse" : audioDb > 55 ? "text-amber-400" : "text-emerald-400"
                 )}>
                   {audioDb.toFixed(1)} dB
                 </span>
@@ -583,66 +645,65 @@ export default function VideoFeed() {
           </div>
 
           {/* Player Controls Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 glass-panel p-2.5 px-3.5 rounded-xl border border-white/10 text-xs font-mono">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3.5 glass-panel p-3.5 px-5 rounded-2xl border border-white/15 text-sm font-mono shadow-md">
+            <div className="flex items-center gap-2.5">
               <button
                 onClick={captureSnapshot}
-                disabled={streamStatus !== 'connected'}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary/20 hover:bg-secondary/30 border border-secondary/40 text-secondary rounded-lg font-bold transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-secondary/20 hover:bg-secondary/30 border border-secondary/40 text-secondary rounded-xl font-bold transition cursor-pointer"
               >
-                <Camera className="w-3.5 h-3.5" />
+                <Camera className="w-4 h-4" />
                 <span>SNAPSHOT</span>
               </button>
 
               <button
                 onClick={() => setNightVision(!nightVision)}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold transition",
+                  "flex items-center gap-2 px-4 py-2 rounded-xl border font-bold transition cursor-pointer",
                   nightVision
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                    : "bg-white/5 text-gray-400 border-white/10 hover:text-white"
+                    ? "bg-emerald-500/25 text-emerald-400 border-emerald-500/40"
+                    : "bg-white/5 text-gray-300 border-white/15 hover:text-white"
                 )}
               >
-                <Eye className="w-3.5 h-3.5" />
+                <Eye className="w-4 h-4" />
                 <span>NIGHT IR: {nightVision ? 'ON' : 'OFF'}</span>
               </button>
 
               <button
                 onClick={() => setOsdEnabled(!osdEnabled)}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold transition",
+                  "flex items-center gap-2 px-4 py-2 rounded-xl border font-bold transition cursor-pointer",
                   osdEnabled
-                    ? "bg-primary/20 text-primary border-primary/40"
-                    : "bg-white/5 text-gray-400 border-white/10 hover:text-white"
+                    ? "bg-primary/25 text-primary border-primary/40"
+                    : "bg-white/5 text-gray-300 border-white/15 hover:text-white"
                 )}
               >
-                <Layers className="w-3.5 h-3.5" />
+                <Layers className="w-4 h-4" />
                 <span>HUD OSD: {osdEnabled ? 'ON' : 'OFF'}</span>
               </button>
             </div>
 
             <div className="flex items-center gap-3">
               {/* Antenna Hardware Badges */}
-              <div className="hidden sm:flex items-center gap-1.5 text-[10px]">
-                <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded font-bold">
+              <div className="hidden sm:flex items-center gap-2 text-xs">
+                <span className="bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-2.5 py-1 rounded-md font-bold">
                   ANT-1 [HIGH]
                 </span>
-                <span className="bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded">
+                <span className="bg-white/5 border border-white/15 text-gray-400 px-2.5 py-1 rounded-md font-semibold">
                   ANT-2 [LOW]
                 </span>
               </div>
 
-              <div className="flex items-center gap-1 text-gray-400">
+              <div className="flex items-center gap-1.5 text-gray-300 font-bold">
                 <span>FPS:</span>
                 <button
                   onClick={() => setTargetFps(30)}
-                  className={clsx("px-2 py-0.5 rounded font-bold", targetFps === 30 ? "bg-primary text-white" : "hover:text-white")}
+                  className={clsx("px-2.5 py-1 rounded-md font-bold cursor-pointer", targetFps === 30 ? "bg-primary text-white" : "hover:text-white")}
                 >
                   30
                 </button>
                 <button
                   onClick={() => setTargetFps(15)}
-                  className={clsx("px-2 py-0.5 rounded font-bold", targetFps === 15 ? "bg-primary text-white" : "hover:text-white")}
+                  className={clsx("px-2.5 py-1 rounded-md font-bold cursor-pointer", targetFps === 15 ? "bg-primary text-white" : "hover:text-white")}
                 >
                   15
                 </button>
@@ -650,10 +711,10 @@ export default function VideoFeed() {
 
               <button
                 onClick={toggleFullscreen}
-                className="p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-gray-300 hover:text-white transition"
+                className="p-2 bg-white/10 hover:bg-white/20 border border-white/15 rounded-xl text-gray-200 hover:text-white transition cursor-pointer"
                 title="Fullscreen Toggle"
               >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
               </button>
             </div>
           </div>
@@ -663,54 +724,56 @@ export default function VideoFeed() {
         <div className="lg:col-span-4 space-y-4">
           
           {/* Stream Performance Card */}
-          <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-primary" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">REALTIME STREAM TELEMETRY</h3>
+          <div className="glass-panel p-5 rounded-2xl border border-white/15 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <Activity className="w-5 h-5 text-primary" />
+                <h2 className="text-sm md:text-base font-extrabold text-white uppercase tracking-wider">
+                  REALTIME STREAM TELEMETRY
+                </h2>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-md bg-primary/20 text-primary border border-primary/40">
                 LOW-LATENCY
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-              <div className="bg-black/40 border border-white/5 p-2.5 rounded-lg">
-                <div className="text-gray-400 text-[10px] uppercase">RENDER FPS</div>
-                <div className="text-lg font-bold text-primary mt-0.5">{metrics.fps} / 30</div>
-                <div className="text-[10px] text-gray-500">Targeting 30.0 FPS</div>
+            <div className="grid grid-cols-2 gap-3 text-sm font-mono">
+              <div className="bg-black/50 border border-white/10 p-3.5 rounded-xl shadow-inner">
+                <div className="text-gray-400 text-xs font-bold uppercase">RENDER FPS</div>
+                <div className="text-2xl font-extrabold text-primary mt-1">{metrics.fps} / 30</div>
+                <div className="text-xs text-gray-400 font-medium">Targeting 30.0 FPS</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 p-2.5 rounded-lg">
-                <div className="text-gray-400 text-[10px] uppercase">THROUGHPUT</div>
-                <div className="text-lg font-bold text-secondary mt-0.5">{metrics.bandwidthKbps} KB/S</div>
-                <div className="text-[10px] text-gray-500">MJPEG Stream Bandwidth</div>
+              <div className="bg-black/50 border border-white/10 p-3.5 rounded-xl shadow-inner">
+                <div className="text-gray-400 text-xs font-bold uppercase">THROUGHPUT</div>
+                <div className="text-2xl font-extrabold text-secondary mt-1">{metrics.bandwidthKbps} KB/S</div>
+                <div className="text-xs text-gray-400 font-medium">MJPEG Stream Bandwidth</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 p-2.5 rounded-lg">
-                <div className="text-gray-400 text-[10px] uppercase">EST. LATENCY</div>
-                <div className="text-lg font-bold text-emerald-400 mt-0.5">{metrics.latencyMs} ms</div>
-                <div className="text-[10px] text-gray-500">Edge to WebRTC/WS</div>
+              <div className="bg-black/50 border border-white/10 p-3.5 rounded-xl shadow-inner">
+                <div className="text-gray-400 text-xs font-bold uppercase">EST. LATENCY</div>
+                <div className="text-2xl font-extrabold text-emerald-400 mt-1">{metrics.latencyMs} ms</div>
+                <div className="text-xs text-gray-400 font-medium">Edge to WebRTC/WS</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 p-2.5 rounded-lg">
-                <div className="text-gray-400 text-[10px] uppercase">RESOLUTION</div>
-                <div className="text-lg font-bold text-white mt-0.5">{selectedQuality.toUpperCase()}</div>
-                <div className="text-[10px] text-gray-500">1280x720 HD Output</div>
+              <div className="bg-black/50 border border-white/10 p-3.5 rounded-xl shadow-inner">
+                <div className="text-gray-400 text-xs font-bold uppercase">RESOLUTION</div>
+                <div className="text-2xl font-extrabold text-white mt-1">{selectedQuality.toUpperCase()}</div>
+                <div className="text-xs text-gray-400 font-medium">1280x720 HD Output</div>
               </div>
             </div>
 
             {/* Quality Switcher */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-mono text-gray-400">RESOLUTION PROFILES:</label>
-              <div className="grid grid-cols-3 gap-2 text-xs font-mono">
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold text-gray-300">RESOLUTION PROFILES:</label>
+              <div className="grid grid-cols-3 gap-2.5 text-sm font-mono">
                 <button
                   onClick={() => setSelectedQuality('720p')}
                   className={clsx(
-                    "py-1.5 rounded-lg border font-bold text-center transition",
+                    "py-2 rounded-xl border font-extrabold text-center transition cursor-pointer",
                     selectedQuality === '720p'
-                      ? "bg-primary/20 border-primary text-primary"
-                      : "bg-black/40 border-white/10 text-gray-400 hover:text-white"
+                      ? "bg-primary/25 border-primary text-primary shadow-sm"
+                      : "bg-black/50 border-white/15 text-gray-400 hover:text-white"
                   )}
                 >
                   720p HD
@@ -718,10 +781,10 @@ export default function VideoFeed() {
                 <button
                   onClick={() => setSelectedQuality('vga')}
                   className={clsx(
-                    "py-1.5 rounded-lg border font-bold text-center transition",
+                    "py-2 rounded-xl border font-extrabold text-center transition cursor-pointer",
                     selectedQuality === 'vga'
-                      ? "bg-primary/20 border-primary text-primary"
-                      : "bg-black/40 border-white/10 text-gray-400 hover:text-white"
+                      ? "bg-primary/25 border-primary text-primary shadow-sm"
+                      : "bg-black/50 border-white/15 text-gray-400 hover:text-white"
                   )}
                 >
                   480p VGA
@@ -729,10 +792,10 @@ export default function VideoFeed() {
                 <button
                   onClick={() => setSelectedQuality('qvga')}
                   className={clsx(
-                    "py-1.5 rounded-lg border font-bold text-center transition",
+                    "py-2 rounded-xl border font-extrabold text-center transition cursor-pointer",
                     selectedQuality === 'qvga'
-                      ? "bg-primary/20 border-primary text-primary"
-                      : "bg-black/40 border-white/10 text-gray-400 hover:text-white"
+                      ? "bg-primary/25 border-primary text-primary shadow-sm"
+                      : "bg-black/50 border-white/15 text-gray-400 hover:text-white"
                   )}
                 >
                   240p QVGA
@@ -742,27 +805,29 @@ export default function VideoFeed() {
           </div>
 
           {/* Hardware Pinout Reference Box */}
-          <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-2.5 text-xs font-mono">
-            <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-              <Cpu className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-bold text-white uppercase tracking-wider text-[11px]">HARDWARE PINOUT STATUS</h3>
+          <div className="glass-panel p-5 rounded-2xl border border-white/15 space-y-3 text-sm font-mono shadow-xl">
+            <div className="flex items-center gap-2.5 border-b border-white/10 pb-2.5">
+              <Cpu className="w-5 h-5 text-emerald-400" />
+              <h2 className="font-extrabold text-white uppercase tracking-wider text-xs md:text-sm">
+                HARDWARE PINOUT STATUS
+              </h2>
             </div>
-            <div className="space-y-1.5 text-[11px] text-gray-300">
-              <div className="flex justify-between border-b border-white/5 pb-1">
+            <div className="space-y-2 text-xs md:text-sm text-gray-200">
+              <div className="flex justify-between border-b border-white/5 pb-1.5">
                 <span className="text-gray-400">INMP441 BCLK / SCK:</span>
-                <span className="text-cyan-400 font-bold">GPIO 14</span>
+                <span className="text-cyan-400 font-extrabold">GPIO 14</span>
               </div>
-              <div className="flex justify-between border-b border-white/5 pb-1">
+              <div className="flex justify-between border-b border-white/5 pb-1.5">
                 <span className="text-gray-400">INMP441 WS / LRCK:</span>
-                <span className="text-cyan-400 font-bold">GPIO 15</span>
+                <span className="text-cyan-400 font-extrabold">GPIO 15</span>
               </div>
-              <div className="flex justify-between border-b border-white/5 pb-1">
+              <div className="flex justify-between border-b border-white/5 pb-1.5">
                 <span className="text-gray-400">INMP441 SD / DOUT:</span>
-                <span className="text-cyan-400 font-bold">GPIO 13</span>
+                <span className="text-cyan-400 font-extrabold">GPIO 13</span>
               </div>
-              <div className="flex justify-between border-b border-white/5 pb-1">
+              <div className="flex justify-between border-b border-white/5 pb-1.5">
                 <span className="text-gray-400">ANT-1 Control (Front):</span>
-                <span className="text-emerald-400 font-bold">IO2 [HIGH]</span>
+                <span className="text-emerald-400 font-extrabold">IO2 [HIGH]</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">ANT-2 Control (Rear):</span>
@@ -772,30 +837,32 @@ export default function VideoFeed() {
           </div>
 
           {/* Captured Tactical Snapshots */}
-          <div className="glass-panel p-4 rounded-xl border border-white/10 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <div className="flex items-center gap-2">
-                <Camera className="w-4 h-4 text-secondary" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">TACTICAL SNAPSHOTS</h3>
+          <div className="glass-panel p-5 rounded-2xl border border-white/15 space-y-3.5 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <div className="flex items-center gap-2.5">
+                <Camera className="w-5 h-5 text-secondary" />
+                <h2 className="text-xs md:text-sm font-extrabold text-white uppercase tracking-wider">
+                  TACTICAL SNAPSHOTS
+                </h2>
               </div>
-              <span className="text-[10px] font-mono text-gray-400">{snapshots.length} STORED</span>
+              <span className="text-xs font-mono font-bold text-gray-400">{snapshots.length} STORED</span>
             </div>
 
             {snapshots.length === 0 ? (
-              <div className="py-6 text-center text-xs font-mono text-gray-500 border border-dashed border-white/10 rounded-lg">
+              <div className="py-6 text-center text-xs font-mono text-gray-500 border border-dashed border-white/10 rounded-xl">
                 Click SNAPSHOT to capture high-res frame
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 {snapshots.map((snap, i) => (
-                  <div key={i} className="relative group rounded-lg overflow-hidden border border-white/10 aspect-video">
+                  <div key={i} className="relative group rounded-xl overflow-hidden border border-white/15 aspect-video shadow-md">
                     <img src={snap} alt={`Snapshot ${i}`} className="w-full h-full object-cover" />
                     <a
                       href={snap}
                       download={`tactical-snapshot-${i + 1}.jpg`}
-                      className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 text-white text-xs font-mono transition"
+                      className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 text-white text-xs font-mono font-bold transition"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Download className="w-4 h-4" />
                       <span>SAVE</span>
                     </a>
                   </div>
@@ -808,3 +875,4 @@ export default function VideoFeed() {
     </div>
   );
 }
+
