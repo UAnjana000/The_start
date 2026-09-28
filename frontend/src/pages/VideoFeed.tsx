@@ -17,8 +17,7 @@ import {
   Crosshair,
   Mic,
   Volume2,
-  VolumeX,
-  Image as ImageIcon
+  VolumeX
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -40,21 +39,13 @@ export default function VideoFeed() {
   const audioAbortControllerRef = useRef<AbortController | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
 
-  // Keyframe / Presentation Mock Mode (Defaulting to Keyframe 1 from 'keyframe img/')
-  const [feedMode, setFeedMode] = useState<'keyframe' | 'live'>('keyframe');
-  const [selectedKeyframe, setSelectedKeyframe] = useState<string>('1');
-
   // Connection & Stream State
-  const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connected');
-  const [targetNode] = useState<string>('s3-cam');
+  const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
+  const [targetNode, setTargetNode] = useState<string>('s3-cam');
   const [selectedQuality, setSelectedQuality] = useState<'720p' | 'vga' | 'qvga'>('720p');
   const [targetFps, setTargetFps] = useState<number>(30);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [snapshots, setSnapshots] = useState<string[]>([
-    '/keyframes/1.jpeg',
-    '/keyframes/2.jpeg',
-    '/keyframes/3.jpeg'
-  ]);
+  const [snapshots, setSnapshots] = useState<string[]>([]);
   const [osdEnabled, setOsdEnabled] = useState<boolean>(true);
   const [nightVision, setNightVision] = useState<boolean>(false);
 
@@ -62,11 +53,11 @@ export default function VideoFeed() {
   const [speakerEnabled, setSpeakerEnabled] = useState<boolean>(false);
   const [audioDb, setAudioDb] = useState<number>(58.4);
 
-  // Performance Metrics (Presentation-ready defaults)
+  // Performance Metrics
   const [metrics, setMetrics] = useState<StreamMetrics>({
-    fps: 30,
-    bandwidthKbps: 1840,
-    frameCount: 2480,
+    fps: 0,
+    bandwidthKbps: 0,
+    frameCount: 0,
     latencyMs: 16,
     resolution: '1280x720 (720p HD)'
   });
@@ -76,35 +67,6 @@ export default function VideoFeed() {
   const frameTimesRef = useRef<number[]>([]);
   const bytesAccumRef = useRef<number>(0);
   const lastBandwidthCalcRef = useRef<number>(performance.now());
-
-  // Render Keyframe image onto canvas in Keyframe mode
-  useEffect(() => {
-    if (feedMode !== 'keyframe') return;
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = `/keyframes/${selectedKeyframe}.jpeg`;
-
-    img.onload = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      canvas.width = 1280;
-      canvas.height = 720;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      if (nightVision) {
-        ctx.filter = 'brightness(1.3) contrast(1.4) hue-rotate(90deg) saturate(2.0)';
-      } else {
-        ctx.filter = 'none';
-      }
-
-      ctx.drawImage(img, 0, 0, 1280, 720);
-    };
-  }, [feedMode, selectedKeyframe, nightVision]);
 
   // ==========================================================================
   // WEB AUDIO API -- SPEAKER OUTPUT & REAL-TIME PCM AUDIO PLAYBACK
@@ -211,7 +173,7 @@ export default function VideoFeed() {
     }
   };
 
-  // Real-time Audio dB Level Simulation Loop
+  // Real-time Audio dB Level Simulation / Feedback Loop
   useEffect(() => {
     let animId: number;
     let phase = 0;
@@ -231,11 +193,6 @@ export default function VideoFeed() {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (feedMode === 'keyframe') {
-      setStreamStatus('connected');
-      return;
-    }
-
     if (wsRef.current) {
       try {
         wsRef.current.close();
@@ -342,29 +299,27 @@ export default function VideoFeed() {
       console.error('[VideoFeed] Connection setup failed:', err);
       setStreamStatus('error');
     }
-  }, [feedMode, nightVision]);
+  }, [nightVision]);
 
   useEffect(() => {
-    if (feedMode === 'live') {
-      connectWebSocket();
+    connectWebSocket();
 
-      const interval = setInterval(() => {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.CLOSED) {
-          connectWebSocket();
-        }
-      }, 5000);
+    const interval = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.CLOSED) {
+        connectWebSocket();
+      }
+    }, 5000);
 
-      return () => {
-        clearInterval(interval);
-        if (wsRef.current) {
-          wsRef.current.close();
-        }
-        if (audioAbortControllerRef.current) {
-          audioAbortControllerRef.current.abort();
-        }
-      };
-    }
-  }, [feedMode, connectWebSocket]);
+    return () => {
+      clearInterval(interval);
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (audioAbortControllerRef.current) {
+        audioAbortControllerRef.current.abort();
+      }
+    };
+  }, [connectWebSocket]);
 
   // Take Snapshot
   const captureSnapshot = () => {
@@ -414,45 +369,28 @@ export default function VideoFeed() {
           </div>
         </div>
 
-        {/* Presentation Source Selector (Keyframe 1, 2, 3 vs Live Stream) */}
+        {/* Source Switcher & Global Status */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-black/60 border border-white/15 px-3 py-2 rounded-xl text-sm font-mono">
-            <ImageIcon className="w-4 h-4 text-secondary" />
-            <span className="text-gray-400 font-bold">VIEWPORT:</span>
+            <Cpu className="w-4 h-4 text-secondary" />
+            <span className="text-gray-400 font-bold">SOURCE:</span>
             <select
-              value={feedMode === 'keyframe' ? `kf-${selectedKeyframe}` : 'live'}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val.startsWith('kf-')) {
-                  setFeedMode('keyframe');
-                  setSelectedKeyframe(val.replace('kf-', ''));
-                  setStreamStatus('connected');
-                } else {
-                  setFeedMode('live');
-                }
-              }}
+              value={targetNode}
+              onChange={(e) => setTargetNode(e.target.value)}
               className="bg-transparent text-primary font-extrabold text-sm focus:outline-none cursor-pointer"
             >
-              <option value="kf-1" className="bg-slate-900 text-white">KEYFRAME 1 (CQB Corridor 720p)</option>
-              <option value="kf-2" className="bg-slate-900 text-white">KEYFRAME 2 (Tactical Operator 720p)</option>
-              <option value="kf-3" className="bg-slate-900 text-white">KEYFRAME 3 (Perimeter Recon 720p)</option>
-              <option value="live" className="bg-slate-900 text-white">LIVE ESP32-CAM (WS Relay 8090)</option>
+              <option value="s3-cam" className="bg-slate-900 text-white">ESP32-CAM / S3 (Mic &amp; Dual-Ant)</option>
+              <option value="node-3" className="bg-slate-900 text-white">Node 3 (ESP32-C6 Cam)</option>
             </select>
           </div>
 
           <button
-            onClick={() => {
-              if (feedMode === 'live') {
-                connectWebSocket();
-              } else {
-                setStreamStatus('connected');
-              }
-            }}
+            onClick={connectWebSocket}
             className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary rounded-xl text-sm font-mono font-bold transition shadow-sm cursor-pointer"
-            title="Refresh stream"
+            title="Reconnect stream bridge"
           >
             <RefreshCw className={clsx("w-4 h-4", streamStatus === 'connecting' && "animate-spin")} />
-            <span>SYNC</span>
+            <span>RECONNECT</span>
           </button>
         </div>
       </div>
@@ -531,8 +469,8 @@ export default function VideoFeed() {
               </>
             )}
 
-            {/* Offline / Error / Connecting State Overlay (Live WS mode only) */}
-            {feedMode === 'live' && streamStatus !== 'connected' && (
+            {/* Offline / Error / Connecting State Overlay */}
+            {streamStatus !== 'connected' && (
               <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center gap-4">
                 {streamStatus === 'connecting' && (
                   <>

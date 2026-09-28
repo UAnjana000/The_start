@@ -1,0 +1,39 @@
+services:
+  # ----------------------------------------------------------------------------
+  # Tactical Mesh Frontend (React 19 + Tailwind + Vite + Nginx)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sih_helmet_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - mesh_network
+
+  # ----------------------------------------------------------------------------
+  # ESP32-CAM Video & INMP441 Audio WebSocket Relay Backend (Optional)
+  # ----------------------------------------------------------------------------
+  video-backend:
+    build:
+      context: ./video-backend
+      dockerfile: Dockerfile
+    container_name: sih_helmet_video_backend
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+      - "8091:8091"
+    environment:
+      - NODE_ENV=production
+      - WS_PORT=8090
+      - HTTP_PORT=8091
+    networks:
+      - mesh_network
+
+networks:
+  mesh_network:
+    driver: bridge
