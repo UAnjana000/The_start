@@ -23,21 +23,21 @@ const mockNodes = [
 export default function GpsMap() {
   return (
     <div className="flex flex-col h-full">
-      <div className="p-6 border-b border-white/10 flex items-center justify-between bg-panel z-10">
-        <div className="flex items-center gap-3">
-          <MapIcon className="text-secondary" size={24} />
-          <h1 className="text-xl font-bold tracking-widest">GPS TRACKING</h1>
+      <div className="p-6 border-b border-white/15 flex items-center justify-between bg-panel z-10 shadow-lg">
+        <div className="flex items-center gap-3.5">
+          <MapIcon className="text-secondary w-7 h-7" />
+          <h1 className="text-2xl font-black tracking-widest text-white">TACTICAL GPS MESH TRACKING</h1>
         </div>
-        <div className="flex gap-4 text-xs font-mono font-bold">
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> GATEWAY</div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-green-500 rounded-full"></div> ACTIVE</div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-orange-500 rounded-full"></div> DEGRADED</div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded-full"></div> INACTIVE</div>
+        <div className="flex gap-4 text-sm font-mono font-bold">
+          <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10"><div className="w-3.5 h-3.5 bg-sky-400 rounded-full"></div> GATEWAY</div>
+          <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10"><div className="w-3.5 h-3.5 bg-emerald-400 rounded-full"></div> ACTIVE</div>
+          <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10"><div className="w-3.5 h-3.5 bg-amber-400 rounded-full"></div> DEGRADED</div>
+          <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10"><div className="w-3.5 h-3.5 bg-rose-500 rounded-full"></div> INACTIVE</div>
         </div>
       </div>
       
       <div className="flex-1 relative z-0">
-        <MapContainer center={center} zoom={16} style={{ height: '100%', width: '100%', background: '#050A12' }}>
+        <MapContainer center={center} zoom={16} style={{ height: '100%', width: '100%', background: '#182444' }}>
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'

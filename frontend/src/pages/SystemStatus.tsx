@@ -2,35 +2,35 @@ import { Server, Database, Cpu, Globe, Radio, Activity } from 'lucide-react';
 
 export default function SystemStatus() {
   return (
-    <div className="p-8 h-full overflow-y-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <Server className="text-primary" size={24} />
-        <h1 className="text-2xl font-bold tracking-widest">SYSTEM STATUS</h1>
+    <div className="p-8 h-full overflow-y-auto space-y-8">
+      <div className="flex items-center gap-3.5 mb-4">
+        <Server className="text-primary w-8 h-8" />
+        <h1 className="text-3xl font-black tracking-widest text-white">SUBSYSTEM STATUS &amp; C4ISR HEALTH</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <StatusCard title="GATEWAY STATUS" status="ONLINE" icon={<Radio />} />
-        <StatusCard title="SIMULATION ENGINE" status="IDLE" icon={<Cpu />} type="warning" />
-        <StatusCard title="AI MODEL" status="ONLINE" icon={<BrainIcon />} />
-        <StatusCard title="DATABASE" status="ONLINE" icon={<Database />} />
-        <StatusCard title="WEBSOCKET" status="ONLINE" icon={<Globe />} />
-        <StatusCard title="MESH ROUTING ENGINE" status="ONLINE" icon={<NetworkIcon />} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StatusCard title="COMMAND GATEWAY" status="ONLINE (ACTIVE)" icon={<Radio className="w-6 h-6" />} />
+        <StatusCard title="REALTIME MESH ENGINE" status="RUNNING (30Hz)" icon={<Cpu className="w-6 h-6" />} />
+        <StatusCard title="AI XGBOOST INFERENCE" status="ONLINE (v2.4)" icon={<BrainIcon />} />
+        <StatusCard title="MISSION TELEMETRY DB" status="ONLINE (LOCKED)" icon={<Database className="w-6 h-6" />} />
+        <StatusCard title="WEBSOCKET RELAY BRIDGE" status="ONLINE (8090)" icon={<Globe className="w-6 h-6" />} />
+        <StatusCard title="MULTI-ANTENNA ROUTING" status="ONLINE (DIVERSITY)" icon={<NetworkIcon />} />
       </div>
 
-      <div className="glass-panel p-6">
-        <h3 className="text-sm font-bold tracking-widest mb-6 border-b border-white/10 pb-2 flex items-center gap-2">
-          <Activity size={16} className="text-secondary" />
-          NETWORK PERFORMANCE METRICS
+      <div className="glass-panel p-6 shadow-xl border border-white/15">
+        <h3 className="text-base font-extrabold tracking-widest mb-6 border-b border-white/10 pb-3 flex items-center gap-2.5 text-white uppercase">
+          <Activity size={20} className="text-secondary" />
+          AGGREGATE NETWORK PERFORMANCE TELEMETRY
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 font-mono">
           <MetricBox label="PACKETS GENERATED" value="1,245,892" />
           <MetricBox label="PACKETS DELIVERED" value="1,210,430" />
-          <MetricBox label="PACKETS LOST" value="35,462" color="text-warning" />
-          <MetricBox label="NETWORK PDR" value="97.15%" color="text-healthy" />
-          <MetricBox label="AVERAGE LATENCY" value="42 ms" />
-          <MetricBox label="ROUTE CHANGES" value="1,432" />
-          <MetricBox label="DISCONNECTED NODES" value="0" color="text-healthy" />
-          <MetricBox label="SIMULATION UPTIME" value="14:22:05" />
+          <MetricBox label="PACKETS DROPPED" value="35,462" color="text-warning" />
+          <MetricBox label="OVERALL MESH PDR" value="97.15%" color="text-healthy" />
+          <MetricBox label="AVERAGE LATENCY" value="14.8 ms" color="text-secondary" />
+          <MetricBox label="DYNAMIC ROUTE CHANGES" value="1,432" />
+          <MetricBox label="ISOLATED PARTITIONS" value="0" color="text-healthy" />
+          <MetricBox label="CONTINUOUS UPTIME" value="14:22:05" color="text-primary" />
         </div>
       </div>
     </div>
@@ -39,19 +39,19 @@ export default function SystemStatus() {
 
 function StatusCard({ title, status, icon, type = 'healthy' }: { title: string, status: string, icon: React.ReactNode, type?: 'healthy'|'warning'|'failure' }) {
   const colors = {
-    healthy: 'text-healthy bg-healthy/10 border-healthy/30',
-    warning: 'text-warning bg-warning/10 border-warning/30',
-    failure: 'text-failure bg-failure/10 border-failure/30',
+    healthy: 'text-healthy bg-healthy/15 border-healthy/40',
+    warning: 'text-warning bg-warning/15 border-warning/40',
+    failure: 'text-failure bg-failure/15 border-failure/40',
   };
 
   return (
-    <div className="glass-panel p-6 flex items-center gap-4">
-      <div className={`p-3 rounded-lg border ${colors[type]}`}>
+    <div className="glass-panel p-6 flex items-center gap-5 shadow-lg border border-white/15">
+      <div className={`p-4 rounded-xl border ${colors[type]} shrink-0 shadow-md`}>
         {icon}
       </div>
       <div>
-        <div className="text-xs text-gray-500 font-bold tracking-wider mb-1">{title}</div>
-        <div className={`font-mono font-bold ${type === 'healthy' ? 'text-healthy' : type === 'warning' ? 'text-warning' : 'text-failure'}`}>
+        <div className="text-xs text-gray-400 font-bold tracking-wider mb-1.5 uppercase">{title}</div>
+        <div className={`font-mono text-lg font-black ${type === 'healthy' ? 'text-healthy' : type === 'warning' ? 'text-warning' : 'text-failure'}`}>
           {status}
         </div>
       </div>
@@ -61,9 +61,9 @@ function StatusCard({ title, status, icon, type = 'healthy' }: { title: string, 
 
 function MetricBox({ label, value, color = "text-white" }: { label: string, value: string, color?: string }) {
   return (
-    <div className="bg-white/5 p-4 rounded-lg border border-white/5">
-      <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-2">{label}</div>
-      <div className={`text-xl font-bold ${color}`}>{value}</div>
+    <div className="bg-black/40 p-5 rounded-xl border border-white/10 shadow-inner">
+      <div className="text-xs text-gray-400 font-bold tracking-wider mb-2 uppercase">{label}</div>
+      <div className={`text-2xl font-black ${color}`}>{value}</div>
     </div>
   );
 }

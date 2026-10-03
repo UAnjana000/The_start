@@ -18,6 +18,7 @@ const WebSocket = require('ws');
 // ============================================================================
 const WS_PORT = process.env.WS_PORT || 8090;
 const HTTP_PORT = process.env.HTTP_PORT || 8091;
+const TARGET_FPS = parseInt(process.env.TARGET_FPS, 10) || 15;
 
 // Default node video stream sources (can be expanded for multiple soldier helmets)
 const STREAM_SOURCES = {
@@ -146,12 +147,21 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Broadcast binary JPEG frame buffer to all connected clients
+// Broadcast binary JPEG frame buffer to all connected clients (throttled to TARGET_FPS)
+let lastBroadcastTime = 0;
+const minBroadcastInterval = 1000 / TARGET_FPS;
+
 function broadcastFrame(jpegBuffer) {
+  const now = Date.now();
+  if (now - lastBroadcastTime < minBroadcastInterval - 4) {
+    return; // Throttle to target 15 FPS
+  }
+  lastBroadcastTime = now;
+
   frameCounterInterval++;
   streamMetrics.frameCount++;
   streamMetrics.bytesReceived += jpegBuffer.length;
-  streamMetrics.lastFrameTime = Date.now();
+  streamMetrics.lastFrameTime = now;
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {

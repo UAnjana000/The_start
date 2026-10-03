@@ -16,19 +16,19 @@ import {
 import type { LinkSample, NodeSample, SimEvent, SimLink, SimNode, SimSettings, Wall } from '../simulation/types'
 
 const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: '#3b82f6',
-  DEGRADED: '#f59e0b',
-  LOW_BATTERY: '#f59e0b',
-  DISCONNECTED: '#ef4444',
-  OFFLINE: '#6b7280',
+  ACTIVE: '#7dd3fc',
+  DEGRADED: '#fcd34d',
+  LOW_BATTERY: '#fcd34d',
+  DISCONNECTED: '#fb7185',
+  OFFLINE: '#94a3b8',
 }
 
 const LINK_COLOR: Record<string, string> = {
-  STRONG: '#22d3ee',
-  GOOD: '#3b82f6',
-  DEGRADED: '#facc15',
-  CRITICAL: '#f97316',
-  DISCONNECTED: '#ef4444',
+  STRONG: '#67e8f9',
+  GOOD: '#7dd3fc',
+  DEGRADED: '#fde047',
+  CRITICAL: '#fb923c',
+  DISCONNECTED: '#fb7185',
 }
 
 function fmtTime(s: number) {
@@ -289,48 +289,48 @@ export default function LiveSimulation() {
 
   return (
     <div className="h-full overflow-y-auto flex flex-col">
-      <div className="flex min-h-[640px]">
-        <div className="flex-1 relative border-r border-white/10 min-w-0">
-          <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-2 text-[10px] font-mono">
-            <span className="glass-panel px-2 py-1">SIMULATED AREA {AREA_W} m × {AREA_H} m</span>
-            <span className="glass-panel px-2 py-1 text-secondary">{settings.frequencyMhz} MHz PROTOTYPE</span>
-            <span className="glass-panel px-2 py-1">{settings.environment}</span>
-            <span className="glass-panel px-2 py-1 text-healthy">HEALTH {health.toFixed(0)}%</span>
+      <div className="flex min-h-[660px]">
+        <div className="flex-1 relative border-r border-white/15 min-w-0">
+          <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-2.5 text-xs md:text-sm font-mono font-bold">
+            <span className="glass-panel px-3 py-1.5 shadow-md border-white/20">SIMULATED AREA {AREA_W} m × {AREA_H} m</span>
+            <span className="glass-panel px-3 py-1.5 text-secondary shadow-md border-white/20">{settings.frequencyMhz} MHz TACTICAL RF</span>
+            <span className="glass-panel px-3 py-1.5 text-sky-300 shadow-md border-white/20">{settings.environment}</span>
+            <span className="glass-panel px-3 py-1.5 text-healthy shadow-md border-white/20">HEALTH {health.toFixed(0)}%</span>
           </div>
           <svg
             ref={svgRef}
             viewBox={`0 0 ${AREA_W} ${AREA_H}`}
-            className="w-full h-[640px] bg-[#07101c] touch-none"
+            className="w-full h-[660px] bg-[#182444] touch-none"
             onPointerMove={onPointerMove}
             onPointerUp={() => { drag.current = null }}
             onPointerLeave={() => { drag.current = null }}
           >
             {Array.from({ length: 10 }).map((_, i) => (
               <g key={i}>
-                <line x1={i * 100} y1={0} x2={i * 100} y2={AREA_H} stroke="rgba(255,255,255,0.04)" />
-                <text x={i * 100 + 4} y={16} fill="rgba(255,255,255,0.35)" fontSize="11">{i * 100} m</text>
+                <line x1={i * 100} y1={0} x2={i * 100} y2={AREA_H} stroke="rgba(255,255,255,0.08)" />
+                <text x={i * 100 + 4} y={18} fill="rgba(255,255,255,0.6)" fontSize="13" fontWeight="700">{i * 100} m</text>
               </g>
             ))}
             {Array.from({ length: 7 }).map((_, i) => (
-              <line key={i} x1={0} y1={i * 100} x2={AREA_W} y2={i * 100} stroke="rgba(255,255,255,0.04)" />
+              <line key={i} x1={0} y1={i * 100} x2={AREA_W} y2={i * 100} stroke="rgba(255,255,255,0.08)" />
             ))}
             {settings.showZones && gw && (
               <>
-                <circle cx={gw.x} cy={gw.y} r={settings.zones.critical} fill="none" stroke="rgba(249,115,22,0.25)" strokeDasharray="6 6" />
-                <circle cx={gw.x} cy={gw.y} r={settings.zones.degraded} fill="none" stroke="rgba(250,204,21,0.25)" strokeDasharray="4 6" />
-                <circle cx={gw.x} cy={gw.y} r={settings.zones.good} fill="none" stroke="rgba(59,130,246,0.3)" />
-                <circle cx={gw.x} cy={gw.y} r={settings.zones.strong} fill="none" stroke="rgba(34,211,238,0.45)" />
-                <text x={gw.x + 8} y={gw.y - settings.zones.strong - 4} fill="#67e8f9" fontSize="11">SIMULATED RF ZONES</text>
+                <circle cx={gw.x} cy={gw.y} r={settings.zones.critical} fill="none" stroke="rgba(244,63,94,0.3)" strokeDasharray="6 6" />
+                <circle cx={gw.x} cy={gw.y} r={settings.zones.degraded} fill="none" stroke="rgba(251,191,36,0.3)" strokeDasharray="4 6" />
+                <circle cx={gw.x} cy={gw.y} r={settings.zones.good} fill="none" stroke="rgba(125,211,252,0.4)" />
+                <circle cx={gw.x} cy={gw.y} r={settings.zones.strong} fill="none" stroke="rgba(103,232,249,0.55)" />
+                <text x={gw.x + 8} y={gw.y - settings.zones.strong - 6} fill="#7dd3fc" fontSize="13" fontWeight="700">SIMULATED RF ZONES</text>
               </>
             )}
             {rooms.map((r) => (
               <g key={r.name + r.x + r.y}>
-                <rect x={r.x} y={r.y} width={r.w} height={r.h} fill="rgba(59,130,246,0.04)" />
-                <text x={r.x + 8} y={r.y + 16} fill="rgba(255,255,255,0.35)" fontSize="11">{r.name}</text>
+                <rect x={r.x} y={r.y} width={r.w} height={r.h} fill="rgba(125,211,252,0.08)" />
+                <text x={r.x + 8} y={r.y + 18} fill="rgba(255,255,255,0.6)" fontSize="13" fontWeight="700">{r.name}</text>
               </g>
             ))}
             {walls.map((w, i) => (
-              <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke={w.material === 'CONCRETE' ? '#cbd5e1' : w.material === 'BRICK' ? '#d6a06a' : w.material === 'GLASS' ? '#7dd3fc' : '#a8a29e'} strokeWidth={w.isOuter ? 3.5 : 2.2} />
+              <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke={w.material === 'CONCRETE' ? '#cbd5e1' : w.material === 'BRICK' ? '#d6a06a' : w.material === 'GLASS' ? '#7dd3fc' : '#a8a29e'} strokeWidth={w.isOuter ? 4 : 2.5} />
             ))}
             {visibleLinks.map((l) => {
               const a = nodes.find((n) => n.id === l.source)
@@ -338,7 +338,7 @@ export default function LiveSimulation() {
               if (!a || !b) return null
               const active = l.isActiveRoute
               const failed = !l.isNeighbour
-              const color = failed ? '#ef4444' : LINK_COLOR[l.status]
+              const color = failed ? '#f43f5e' : LINK_COLOR[l.status]
               const mx = (a.x + b.x) / 2
               const my = (a.y + b.y) / 2
               return (
@@ -346,17 +346,17 @@ export default function LiveSimulation() {
                   <line
                     x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                     stroke={color}
-                    strokeWidth={active ? 2.6 : 1}
-                    strokeOpacity={active ? 0.95 : failed ? 0.35 : 0.4}
-                    strokeDasharray={failed ? '3 4' : l.status === 'CRITICAL' ? '5 4' : undefined}
+                    strokeWidth={active ? 3.5 : 1.5}
+                    strokeOpacity={active ? 1.0 : failed ? 0.4 : 0.5}
+                    strokeDasharray={failed ? '4 4' : l.status === 'CRITICAL' ? '6 4' : undefined}
                   />
                   {active && (
-                    <circle r="3.2" fill="#67e8f9">
-                      <animateMotion dur="1.6s" repeatCount="indefinite" path={`M ${a.x} ${a.y} L ${b.x} ${b.y}`} />
+                    <circle r="4" fill="#38bdf8">
+                      <animateMotion dur="1.5s" repeatCount="indefinite" path={`M ${a.x} ${a.y} L ${b.x} ${b.y}`} />
                     </circle>
                   )}
                   {(settings.showDistances || settings.showRssi) && l.isNeighbour && (
-                    <text x={mx} y={my} fill="#e2e8f0" fontSize="10" textAnchor="middle">
+                    <text x={mx} y={my} fill="#f1f5f9" fontSize="12" fontWeight="700" textAnchor="middle">
                       {settings.showDistances ? `${l.distance.toFixed(0)} m` : ''}
                       {settings.showDistances && settings.showRssi ? ' · ' : ''}
                       {settings.showRssi ? `${l.rssi.toFixed(0)} dBm` : ''}
@@ -367,21 +367,21 @@ export default function LiveSimulation() {
             })}
             {nodes.map((n) => (
               <g key={n.id} onPointerDown={(e) => { if (!n.isGateway) { drag.current = n.id; (e.target as Element).setPointerCapture?.(e.pointerId) } setSelected(n.id) }} className={n.isGateway ? '' : 'cursor-grab'}>
-                {n.isGateway && <circle cx={n.x} cy={n.y} r="16" fill="none" stroke="#1d4ed8" strokeWidth="2"><animate attributeName="r" values="14;22;14" dur="2.4s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.8;0.15;0.8" dur="2.4s" repeatCount="indefinite" /></circle>}
-                <circle cx={n.x} cy={n.y} r={n.isGateway ? 11 : 9} fill={n.isGateway ? '#1e3a8a' : STATUS_COLOR[n.status]} stroke={selected === n.id ? '#67e8f9' : '#0b1220'} strokeWidth={selected === n.id ? 3 : 1.5} />
-                <text x={n.x} y={n.y + 3} textAnchor="middle" fill="white" fontSize="9" fontWeight="700">{n.label}</text>
-                <text x={n.x} y={n.y + 22} textAnchor="middle" fill="#cbd5e1" fontSize="9">{n.indoor ? 'INDOOR' : n.isGateway ? 'GATEWAY' : `${Math.round(n.battery)}%`}</text>
+                {n.isGateway && <circle cx={n.x} cy={n.y} r={20} fill="none" stroke="#7dd3fc" strokeWidth="2.5"><animate attributeName="r" values="16;26;16" dur="2.4s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.9;0.2;0.9" dur="2.4s" repeatCount="indefinite" /></circle>}
+                <circle cx={n.x} cy={n.y} r={n.isGateway ? 14 : 11} fill={n.isGateway ? '#0284c7' : STATUS_COLOR[n.status]} stroke={selected === n.id ? '#7dd3fc' : '#0f172a'} strokeWidth={selected === n.id ? 3.5 : 2} />
+                <text x={n.x} y={n.y + 4} textAnchor="middle" fill="white" fontSize="11" fontWeight="800">{n.label}</text>
+                <text x={n.x} y={n.y + 26} textAnchor="middle" fill="#f8fafc" fontSize="11" fontWeight="700">{n.indoor ? 'INDOOR' : n.isGateway ? 'GATEWAY' : `${Math.round(n.battery)}%`}</text>
               </g>
             ))}
             <g>
-              <line x1="24" y1={AREA_H - 28} x2="124" y2={AREA_H - 28} stroke="#67e8f9" strokeWidth="2" />
-              <text x="24" y={AREA_H - 34} fill="#67e8f9" fontSize="11">100 m</text>
+              <line x1="24" y1={AREA_H - 28} x2="124" y2={AREA_H - 28} stroke="#38bdf8" strokeWidth="2.5" />
+              <text x="24" y={AREA_H - 34} fill="#38bdf8" fontSize="13" fontWeight="700">100 m</text>
             </g>
           </svg>
-          <div className="h-36 overflow-y-auto border-t border-white/10 bg-black/30 p-3 font-mono text-xs space-y-1">
-            {events.length === 0 && <div className="text-gray-500">Event log is empty. Drag a node or start the mission.</div>}
+          <div className="h-40 overflow-y-auto border-t border-white/15 bg-black/40 p-3.5 font-mono text-sm space-y-1.5 font-bold">
+            {events.length === 0 && <div className="text-gray-400">Event log is empty. Drag a node or start the mission.</div>}
             {events.map((ev, i) => (
-              <div key={i} className={clsx(ev.type === 'success' && 'text-healthy', ev.type === 'warning' && 'text-warning', ev.type === 'critical' && 'text-failure', ev.type === 'info' && 'text-gray-300')}>
+              <div key={i} className={clsx(ev.type === 'success' && 'text-healthy', ev.type === 'warning' && 'text-warning', ev.type === 'critical' && 'text-failure', ev.type === 'info' && 'text-gray-200')}>
                 {fmtTime(ev.time)} — {ev.message}
               </div>
             ))}

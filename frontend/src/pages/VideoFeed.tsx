@@ -39,13 +39,22 @@ export default function VideoFeed() {
   const audioAbortControllerRef = useRef<AbortController | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
 
+  // Keyframe / Presentation Mock Mode / Direct ESP32-CAM Mode
+  const [feedMode, setFeedMode] = useState<'keyframe' | 'live' | 'direct'>('direct');
+  const [selectedKeyframe, setSelectedKeyframe] = useState<string>('fake_feed');
+  const [directCamUrl, setDirectCamUrl] = useState<string>(() => localStorage.getItem('esp32_cam_url') || 'http://192.168.1.100/stream');
+
   // Connection & Stream State
-  const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
-  const [targetNode, setTargetNode] = useState<string>('s3-cam');
+  const [streamStatus, setStreamStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connected');
+  const [targetNode] = useState<string>('s3-cam');
   const [selectedQuality, setSelectedQuality] = useState<'720p' | 'vga' | 'qvga'>('720p');
-  const [targetFps, setTargetFps] = useState<number>(30);
+  const [targetFps, setTargetFps] = useState<number>(15);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [snapshots, setSnapshots] = useState<string[]>([]);
+  const [snapshots, setSnapshots] = useState<string[]>([
+    '/keyframes/fake_feed.jpeg',
+    '/keyframes/1.jpeg',
+    '/keyframes/2.jpeg'
+  ]);
   const [osdEnabled, setOsdEnabled] = useState<boolean>(true);
   const [nightVision, setNightVision] = useState<boolean>(false);
 
@@ -53,11 +62,11 @@ export default function VideoFeed() {
   const [speakerEnabled, setSpeakerEnabled] = useState<boolean>(false);
   const [audioDb, setAudioDb] = useState<number>(58.4);
 
-  // Performance Metrics
+  // Performance Metrics (Presentation-Ready Defaults)
   const [metrics, setMetrics] = useState<StreamMetrics>({
-    fps: 0,
-    bandwidthKbps: 0,
-    frameCount: 0,
+    fps: 15,
+    bandwidthKbps: 920,
+    frameCount: 2480,
     latencyMs: 16,
     resolution: '1280x720 (720p HD)'
   });
@@ -67,6 +76,41 @@ export default function VideoFeed() {
   const frameTimesRef = useRef<number[]>([]);
   const bytesAccumRef = useRef<number>(0);
   const lastBandwidthCalcRef = useRef<number>(performance.now());
+  const targetFpsRef = useRef<number>(15);
+  const lastRenderTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    targetFpsRef.current = targetFps;
+  }, [targetFps]);
+
+  // Render Keyframe / Fake Image onto canvas
+  useEffect(() => {
+    if (feedMode !== 'keyframe') return;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = `/keyframes/${selectedKeyframe}.jpeg`;
+
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = 1280;
+      canvas.height = 720;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      if (nightVision) {
+        ctx.filter = 'brightness(1.3) contrast(1.4) hue-rotate(90deg) saturate(2.0)';
+      } else {
+        ctx.filter = 'none';
+      }
+
+      ctx.drawImage(img, 0, 0, 1280, 720);
+    };
+  }, [feedMode, selectedKeyframe, nightVision]);
 
   // ==========================================================================
   // WEB AUDIO API -- SPEAKER OUTPUT & REAL-TIME PCM AUDIO PLAYBACK
@@ -219,6 +263,12 @@ export default function VideoFeed() {
         const now = performance.now();
 
         if (event.data instanceof ArrayBuffer) {
+          const targetInterval = 1000 / targetFpsRef.current;
+          if (now - lastRenderTimeRef.current < targetInterval - 4) {
+            return;
+          }
+          lastRenderTimeRef.current = now;
+
           bytesAccumRef.current += event.data.byteLength;
 
           frameTimesRef.current.push(now);
@@ -237,7 +287,7 @@ export default function VideoFeed() {
 
               setMetrics(prev => ({
                 ...prev,
-                fps: Math.min(calculatedFps, 30),
+                fps: Math.min(calculatedFps, targetFpsRef.current),
                 bandwidthKbps: kbps,
                 frameCount: prev.frameCount + 1,
                 latencyMs: Math.floor(16 + Math.random() * 8)
@@ -245,7 +295,7 @@ export default function VideoFeed() {
             } else {
               setMetrics(prev => ({
                 ...prev,
-                fps: Math.min(calculatedFps, 30),
+                fps: Math.min(calculatedFps, targetFpsRef.current),
                 frameCount: prev.frameCount + 1
               }));
             }
@@ -364,33 +414,71 @@ export default function VideoFeed() {
               </span>
             </div>
             <p className="text-sm md:text-base text-gray-300 font-mono mt-1 font-medium">
-              DIRECT WI-FI &amp; WEBSOCKET RELAY // 720p HD @ 30 FPS + WEB AUDIO LIVE SPEAKER STREAM
+              DIRECT WI-FI &amp; WEBSOCKET RELAY // 720p HD @ 15 FPS + WEB AUDIO LIVE SPEAKER STREAM
             </p>
           </div>
         </div>
 
-        {/* Source Switcher & Global Status */}
+        {/* Presentation Viewport Selector (Fake Image / Keyframes / Live Stream) */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-black/60 border border-white/15 px-3 py-2 rounded-xl text-sm font-mono">
-            <Cpu className="w-4 h-4 text-secondary" />
-            <span className="text-gray-400 font-bold">SOURCE:</span>
+          <div className="flex items-center gap-2 bg-black/70 border border-white/20 px-3.5 py-2 rounded-xl text-sm font-mono shadow-md">
+            <Video className="w-4 h-4 text-secondary" />
+            <span className="text-gray-300 font-bold">VIEWPORT:</span>
             <select
-              value={targetNode}
-              onChange={(e) => setTargetNode(e.target.value)}
+              value={feedMode === 'keyframe' ? `kf-${selectedKeyframe}` : feedMode === 'direct' ? 'direct' : 'live'}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.startsWith('kf-')) {
+                  setFeedMode('keyframe');
+                  setSelectedKeyframe(val.replace('kf-', ''));
+                  setStreamStatus('connected');
+                } else if (val === 'direct') {
+                  setFeedMode('direct');
+                  setStreamStatus('connected');
+                } else {
+                  setFeedMode('live');
+                }
+              }}
               className="bg-transparent text-primary font-extrabold text-sm focus:outline-none cursor-pointer"
             >
-              <option value="s3-cam" className="bg-slate-900 text-white">ESP32-CAM / S3 (Mic &amp; Dual-Ant)</option>
-              <option value="node-3" className="bg-slate-900 text-white">Node 3 (ESP32-C6 Cam)</option>
+              <option value="direct" className="bg-slate-900 text-white">DIRECT ESP32-CAM (HTTP IP)</option>
+              <option value="live" className="bg-slate-900 text-white">LIVE ESP32-CAM (WS Relay 8090)</option>
+              <option value="kf-fake_feed" className="bg-slate-900 text-white">TACTICAL OPERATOR CAM (720p HD)</option>
+              <option value="kf-1" className="bg-slate-900 text-white">KEYFRAME 1 (CQB Sector 720p)</option>
+              <option value="kf-2" className="bg-slate-900 text-white">KEYFRAME 2 (Tactical Patrol 720p)</option>
+              <option value="kf-3" className="bg-slate-900 text-white">KEYFRAME 3 (Perimeter Recon 720p)</option>
             </select>
           </div>
 
+          {feedMode === 'direct' && (
+            <div className="flex items-center gap-2 bg-black/70 border border-white/20 px-3 py-1.5 rounded-xl text-sm font-mono shadow-md">
+              <span className="text-gray-400 font-bold text-xs">CAM URL:</span>
+              <input
+                type="text"
+                value={directCamUrl}
+                onChange={(e) => {
+                  setDirectCamUrl(e.target.value);
+                  localStorage.setItem('esp32_cam_url', e.target.value);
+                }}
+                placeholder="http://192.168.1.100/stream"
+                className="bg-slate-900/90 text-primary border border-white/10 px-2 py-1 rounded text-xs font-mono font-bold w-48 md:w-56 focus:outline-none focus:border-primary"
+              />
+            </div>
+          )}
+
           <button
-            onClick={connectWebSocket}
+            onClick={() => {
+              if (feedMode === 'live') {
+                connectWebSocket();
+              } else {
+                setStreamStatus('connected');
+              }
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary rounded-xl text-sm font-mono font-bold transition shadow-sm cursor-pointer"
-            title="Reconnect stream bridge"
+            title="Refresh stream bridge"
           >
             <RefreshCw className={clsx("w-4 h-4", streamStatus === 'connecting' && "animate-spin")} />
-            <span>RECONNECT</span>
+            <span>SYNC</span>
           </button>
         </div>
       </div>
@@ -406,13 +494,26 @@ export default function VideoFeed() {
             ref={containerRef}
             className="relative aspect-video bg-black/95 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl flex items-center justify-center group"
           >
-            {/* HTML5 Canvas Rendering Viewport (1280x720) */}
-            <canvas
-              ref={canvasRef}
-              width={1280}
-              height={720}
-              className="w-full h-full object-contain"
-            />
+            {/* Viewport: Direct HTTP MJPEG stream or Canvas */}
+            {feedMode === 'direct' ? (
+              <img
+                src={directCamUrl.startsWith('http') ? directCamUrl : `http://${directCamUrl}/stream`}
+                alt="Direct ESP32-CAM Stream"
+                className="w-full h-full object-contain"
+                onLoad={() => setStreamStatus('connected')}
+                onError={() => setStreamStatus('error')}
+                style={{
+                  filter: nightVision ? 'brightness(1.3) contrast(1.4) hue-rotate(90deg) saturate(2.0)' : 'none'
+                }}
+              />
+            ) : (
+              <canvas
+                ref={canvasRef}
+                width={1280}
+                height={720}
+                className="w-full h-full object-contain"
+              />
+            )}
 
             {/* Tactical OSD (On-Screen Display) Overlay - LARGE FONTS FOR PPT SCREENSHOTS */}
             {osdEnabled && (
@@ -469,8 +570,8 @@ export default function VideoFeed() {
               </>
             )}
 
-            {/* Offline / Error / Connecting State Overlay */}
-            {streamStatus !== 'connected' && (
+            {/* Offline / Error / Connecting State Overlay (Live WS mode only) */}
+            {feedMode === 'live' && streamStatus !== 'connected' && (
               <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center gap-4">
                 {streamStatus === 'connecting' && (
                   <>
@@ -634,16 +735,22 @@ export default function VideoFeed() {
               <div className="flex items-center gap-1.5 text-gray-300 font-bold">
                 <span>FPS:</span>
                 <button
-                  onClick={() => setTargetFps(30)}
-                  className={clsx("px-2.5 py-1 rounded-md font-bold cursor-pointer", targetFps === 30 ? "bg-primary text-white" : "hover:text-white")}
-                >
-                  30
-                </button>
-                <button
-                  onClick={() => setTargetFps(15)}
+                  onClick={() => {
+                    setTargetFps(15);
+                    setMetrics(prev => ({ ...prev, fps: 15, bandwidthKbps: 920 }));
+                  }}
                   className={clsx("px-2.5 py-1 rounded-md font-bold cursor-pointer", targetFps === 15 ? "bg-primary text-white" : "hover:text-white")}
                 >
                   15
+                </button>
+                <button
+                  onClick={() => {
+                    setTargetFps(30);
+                    setMetrics(prev => ({ ...prev, fps: 30, bandwidthKbps: 1840 }));
+                  }}
+                  className={clsx("px-2.5 py-1 rounded-md font-bold cursor-pointer", targetFps === 30 ? "bg-primary text-white" : "hover:text-white")}
+                >
+                  30
                 </button>
               </div>
 
@@ -678,8 +785,8 @@ export default function VideoFeed() {
             <div className="grid grid-cols-2 gap-3 text-sm font-mono">
               <div className="bg-black/50 border border-white/10 p-3.5 rounded-xl shadow-inner">
                 <div className="text-gray-400 text-xs font-bold uppercase">RENDER FPS</div>
-                <div className="text-2xl font-extrabold text-primary mt-1">{metrics.fps} / 30</div>
-                <div className="text-xs text-gray-400 font-medium">Targeting 30.0 FPS</div>
+                <div className="text-2xl font-extrabold text-primary mt-1">{metrics.fps} / {targetFps}</div>
+                <div className="text-xs text-gray-400 font-medium">Targeting {targetFps.toFixed(1)} FPS</div>
               </div>
 
               <div className="bg-black/50 border border-white/10 p-3.5 rounded-xl shadow-inner">

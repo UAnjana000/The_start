@@ -17,28 +17,28 @@ export default function Navbar() {
   const location = useLocation();
 
   return (
-    <nav className="glass-panel rounded-none border-t-0 border-l-0 border-r-0 border-b-white/10 sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+    <nav className="glass-panel rounded-none border-t-0 border-l-0 border-r-0 border-b border-white/15 sticky top-0 z-50 px-6 md:px-8 py-3.5 flex items-center justify-between shadow-xl">
       <div className="flex items-center gap-8">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary flex items-center justify-center">
-            <Radio size={20} className="text-white" />
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0 shadow-md">
+            <Radio size={22} className="text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-sm tracking-wider text-white">NSG TACTICAL MESH</h1>
-            <div className="text-[10px] text-secondary tracking-widest uppercase">Command & Control</div>
+            <h1 className="font-black text-base md:text-lg tracking-wider text-white">NSG TACTICAL MESH</h1>
+            <div className="text-xs text-secondary tracking-widest uppercase font-mono font-bold">Command &amp; Control C4ISR</div>
           </div>
         </div>
         
-        <div className="hidden lg:flex items-center gap-1">
+        <div className="hidden lg:flex items-center gap-1.5">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
               className={clsx(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors",
+                "flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold tracking-wider transition-colors",
                 location.pathname === item.path 
-                  ? "bg-primary/20 text-primary" 
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  ? "bg-primary/25 text-primary border border-primary/40 shadow-sm" 
+                  : "text-gray-300 hover:text-white hover:bg-white/10"
               )}
             >
               {item.icon}
@@ -48,22 +48,22 @@ export default function Navbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-6 text-xs font-mono">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-healthy animate-pulse"></div>
-          <span className="text-gray-300">SYSTEM ONLINE</span>
+      <div className="flex items-center gap-6 text-sm font-mono font-bold">
+        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-emerald-400">
+          <div className="w-2.5 h-2.5 rounded-full bg-healthy animate-ping"></div>
+          <span>SYSTEM ONLINE</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500">NODES:</span>
-          <span className="text-white font-bold">6/6</span>
+        <div className="hidden sm:flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
+          <span className="text-gray-400">NODES:</span>
+          <span className="text-white font-extrabold">6/6</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500">MISSION:</span>
-          <span className="text-secondary font-bold">SIM-2026-001</span>
+        <div className="hidden md:flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
+          <span className="text-gray-400">MISSION:</span>
+          <span className="text-secondary font-extrabold">SIM-2026-001</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500">HEALTH:</span>
-          <span className="text-healthy font-bold">98%</span>
+        <div className="hidden sm:flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
+          <span className="text-gray-400">HEALTH:</span>
+          <span className="text-healthy font-extrabold">98%</span>
         </div>
       </div>
     </nav>

@@ -3,73 +3,73 @@ import { Link } from 'react-router-dom';
 
 export default function Home() {
   return (
-    <div className="p-8 max-w-7xl mx-auto h-full overflow-y-auto">
-      <div className="mb-12 text-center">
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-4 bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+    <div className="p-8 md:p-12 max-w-7xl mx-auto h-full overflow-y-auto space-y-10">
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-sky-300 bg-clip-text text-transparent leading-tight">
           HELMET-MOUNTED TACTICAL MESH COMMUNICATION SYSTEM
         </h1>
-        <p className="text-xl text-secondary mb-6 tracking-wide">
-          Adaptive communication architecture for NSG close-quarter operations.
+        <p className="text-xl md:text-2xl text-secondary tracking-wide font-bold">
+          Adaptive C4ISR Mesh Communication Architecture for Close-Quarter Operations
         </p>
-        <p className="text-gray-400 max-w-3xl mx-auto text-sm leading-relaxed">
+        <p className="text-gray-200 max-w-4xl mx-auto text-base md:text-lg leading-relaxed font-medium">
           The system models helmet-mounted communication nodes forming a resilient ad-hoc mesh network. 
-          Each commando operates as an intelligent network node capable of communicating directly with a 
-          gateway or dynamically routing through nearby commandos when direct connectivity deteriorates.
+          Each operator acts as an intelligent relay node capable of communicating directly with the command gateway 
+          or dynamically routing packets through neighboring squad members under severe electronic or architectural line-of-sight obstruction.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <FeatureCard 
-          icon={<Network className="text-primary" size={32} />}
+          icon={<Network className="text-primary w-10 h-10" />}
           title="ADAPTIVE MESH ROUTING"
-          description="Nodes automatically select alternate communication paths when direct gateway connectivity becomes weak."
+          description="Nodes continuously evaluate link quality and automatically discover multi-hop alternate paths when direct line-of-sight is blocked by reinforced concrete."
         />
         <FeatureCard 
-          icon={<Radio className="text-secondary" size={32} />}
-          title="DIRECTIONAL ANTENNA INTELLIGENCE"
-          description="Multiple antenna sectors are evaluated using RSSI to select the strongest communication direction."
+          icon={<Radio className="text-secondary w-10 h-10" />}
+          title="DUAL-ANTENNA DIVERSITY"
+          description="Hardware RF multiplexing switches between front and rear hemispherical antenna sectors based on live RSSI delta to maximize gain."
         />
         <FeatureCard 
-          icon={<Activity className="text-healthy" size={32} />}
-          title="REAL-TIME TELEMETRY"
-          description="RSSI, PDR, latency, battery level, node connectivity and route changes are monitored continuously."
+          icon={<Activity className="text-healthy w-10 h-10" />}
+          title="REAL-TIME TELEMETRY STREAM"
+          description="Sub-second transmission of RSSI, PDR, latency, battery levels, acoustic SPL, and dynamic topology changes directly to C2 command."
         />
         <FeatureCard 
-          icon={<BrainCircuit className="text-warning" size={32} />}
-          title="AI LINK OPTIMIZATION"
-          description="An XGBoost model evaluates telemetry to estimate connection quality and assist route selection."
+          icon={<BrainCircuit className="text-warning w-10 h-10" />}
+          title="EDGE XGBOOST AI PREDICTOR"
+          description="Embedded Machine Learning estimates connection degradation 15-30s in advance, enabling proactive route failovers before connection dropouts."
         />
       </div>
 
-      <div className="glass-panel p-8 mb-12">
-        <h3 className="text-lg font-bold mb-6 tracking-wider border-b border-white/10 pb-4">SYSTEM ARCHITECTURE</h3>
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-mono text-gray-300">
-          <div className="glass-panel p-4 text-center w-full md:w-auto">Helmet Node</div>
-          <ArrowRight className="hidden md:block text-primary" />
-          <div className="glass-panel p-4 text-center w-full md:w-auto">Directional Antenna Array</div>
-          <ArrowRight className="hidden md:block text-primary" />
-          <div className="glass-panel p-4 text-center w-full md:w-auto border-primary/50 text-primary">RF Link</div>
-          <ArrowRight className="hidden md:block text-primary" />
-          <div className="glass-panel p-4 text-center w-full md:w-auto">Mesh Network</div>
-          <ArrowRight className="hidden md:block text-primary" />
-          <div className="glass-panel p-4 text-center w-full md:w-auto">Gateway</div>
-          <ArrowRight className="hidden md:block text-primary" />
-          <div className="glass-panel p-4 text-center w-full md:w-auto bg-primary/20 text-white">Mission Dashboard</div>
+      <div className="glass-panel p-8 shadow-xl border border-white/15">
+        <h3 className="text-xl font-black mb-6 tracking-wider border-b border-white/10 pb-4 text-white uppercase">
+          HARDWARE &amp; NETWORK ARCHITECTURE PIPELINE
+        </h3>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-base font-mono font-bold text-gray-200">
+          <div className="glass-panel px-5 py-3.5 text-center w-full md:w-auto bg-slate-900 border-white/20">Helmet Edge Node</div>
+          <ArrowRight className="hidden md:block text-primary w-6 h-6 shrink-0" />
+          <div className="glass-panel px-5 py-3.5 text-center w-full md:w-auto bg-slate-900 border-white/20">Dual-Antenna Array</div>
+          <ArrowRight className="hidden md:block text-primary w-6 h-6 shrink-0" />
+          <div className="glass-panel px-5 py-3.5 text-center w-full md:w-auto border-primary/50 text-primary bg-primary/10">RF Mesh Link</div>
+          <ArrowRight className="hidden md:block text-primary w-6 h-6 shrink-0" />
+          <div className="glass-panel px-5 py-3.5 text-center w-full md:w-auto bg-slate-900 border-white/20">Ad-Hoc Network</div>
+          <ArrowRight className="hidden md:block text-primary w-6 h-6 shrink-0" />
+          <div className="glass-panel px-5 py-3.5 text-center w-full md:w-auto bg-slate-900 border-white/20">C2 Gateway</div>
+          <ArrowRight className="hidden md:block text-primary w-6 h-6 shrink-0" />
+          <div className="glass-panel px-5 py-3.5 text-center w-full md:w-auto bg-primary/25 text-white border-primary">Live Dashboard</div>
         </div>
       </div>
 
-      <div className="glass-panel p-6 border-l-4 border-l-warning bg-warning/5">
-        <h4 className="font-bold text-warning mb-2">PROTOTYPE SIMULATION CONFIGURATIONS</h4>
-        <p className="text-sm text-gray-300">
-          Bands being evaluated: 865 MHz and 1.2 GHz. 
-          <br/>
-          <span className="text-gray-400 italic">Note: These are prototype simulation configurations and do not represent official NSG operating frequencies.</span>
+      <div className="glass-panel p-6 border-l-4 border-l-warning bg-warning/10 shadow-lg">
+        <h4 className="font-extrabold text-lg text-warning mb-2">PROTOTYPE SIMULATION RF SPECIFICATIONS</h4>
+        <p className="text-base text-gray-200 font-medium">
+          Evaluated Frequencies: <strong>865 MHz ISM</strong> and <strong>1.2 GHz Tactical Relay</strong> bands with AES-128 cryptographic telemetry envelopes.
         </p>
       </div>
       
-      <div className="mt-12 text-center pb-12">
-        <Link to="/simulation" className="inline-flex items-center gap-2 bg-primary hover:bg-primary/80 text-white px-8 py-4 rounded-lg font-bold tracking-widest transition-colors">
-          LAUNCH SIMULATOR <ArrowRight size={20} />
+      <div className="text-center pb-8">
+        <Link to="/simulation" className="inline-flex items-center gap-3 bg-primary hover:bg-primary/80 text-slate-950 px-10 py-5 rounded-2xl font-black text-xl tracking-widest transition-all shadow-xl shadow-primary/20">
+          LAUNCH LIVE TACTICAL SIMULATOR <ArrowRight size={24} />
         </Link>
       </div>
     </div>
@@ -78,10 +78,10 @@ export default function Home() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
   return (
-    <div className="glass-panel p-6 hover:bg-white/5 transition-colors">
+    <div className="glass-panel p-7 hover:bg-white/10 transition-colors shadow-lg border border-white/15">
       <div className="mb-4">{icon}</div>
-      <h3 className="text-lg font-bold mb-2 tracking-wide">{title}</h3>
-      <p className="text-gray-400 text-sm leading-relaxed">{description}</p>
+      <h3 className="text-xl font-black mb-2.5 tracking-wide text-white">{title}</h3>
+      <p className="text-gray-300 text-base leading-relaxed font-medium">{description}</p>
     </div>
   );
 }
